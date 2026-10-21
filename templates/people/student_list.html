@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Pupils{% endblock %}
+{% block content %}
+<h1>Pupils</h1>
+<form method="get">
+  <label for="q">Search by name or admission number</label>
+  <input id="q" name="q" value="{{ query }}">
+</form>
+{% if perms.people.add_student %}<a class="btn" href="{% url 'student_add' %}">Add a pupil</a>{% endif %}
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Adm. no.</th><th>Name</th><th>Gender</th><th>Primary contact</th></tr></thead>
+  <tbody>
+  {% for s in students %}
+    <tr>
+      <td>{{ s.admission_number }}</td>
+      <td>{{ s.full_name }}</td>
+      <td>{{ s.get_gender_display }}</td>
+      <td>{% for link in s.guardian_links.all %}{% if link.is_primary %}{{ link.guardian.full_name }}, {{ link.guardian.phone }}{% endif %}{% endfor %}</td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="4" class="muted">No pupils found.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

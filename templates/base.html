@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ school.name|default:"School" }}{% endblock %}</title>
+  <style>
+    :root { --ink:#1d2a33; --muted:#5b6b75; --line:#d9e1e6; --accent:#0b6e4f; --bg:#f6f8f9; --error:#a32020; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color:var(--ink); background:var(--bg); line-height:1.5; }
+    header { background:var(--accent); color:#fff; padding:.75rem 1rem; display:flex; flex-wrap:wrap; gap:1rem; align-items:center; justify-content:space-between; }
+    header a, header button { color:#fff; }
+    header nav { display:flex; gap:1rem; align-items:center; flex-wrap:wrap; }
+    header form { margin:0; }
+    header button { background:none; border:1px solid #fff8; border-radius:4px; padding:.25rem .6rem; cursor:pointer; font:inherit; }
+    main { max-width:960px; margin:0 auto; padding:1.25rem 1rem; }
+    a { color:var(--accent); }
+    table { width:100%; border-collapse:collapse; background:#fff; }
+    th, td { text-align:left; padding:.5rem; border-bottom:1px solid var(--line); }
+    .card { background:#fff; border:1px solid var(--line); border-radius:6px; padding:1rem; margin-bottom:1rem; }
+    .muted { color:var(--muted); }
+    .messages { list-style:none; padding:0; }
+    .messages li { background:#e5f4ee; border:1px solid #b5dccc; padding:.5rem .75rem; border-radius:4px; }
+    .errorlist { color:var(--error); margin:.25rem 0; padding-left:1rem; }
+    label { display:block; font-weight:600; margin-top:.75rem; }
+    input, select { width:100%; max-width:24rem; padding:.45rem; border:1px solid var(--line); border-radius:4px; font:inherit; }
+    .btn { display:inline-block; background:var(--accent); color:#fff; border:0; border-radius:4px; padding:.5rem 1rem; text-decoration:none; cursor:pointer; font:inherit; margin-top:1rem; }
+    .table-wrap { overflow-x:auto; }
+  </style>
+</head>
+<body>
+  <header>
+    <strong>{{ school.name|default:"School" }}</strong>
+    {% if user.is_authenticated %}
+    <nav>
+      <a href="{% url 'home' %}">Home</a>
+      {% if perms.people.view_student %}<a href="{% url 'student_list' %}">Pupils</a>{% endif %}
+      {% if user.is_staff %}<a href="{% url 'admin:index' %}">Admin</a>{% endif %}
+      <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button type="submit">Sign out</button></form>
+    </nav>
+    {% endif %}
+  </header>
+  <main>
+    {% if messages %}<ul class="messages">{% for m in messages %}<li>{{ m }}</li>{% endfor %}</ul>{% endif %}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

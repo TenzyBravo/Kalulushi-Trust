@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Welcome, {{ user.get_full_name|default:user.username }}</h1>
+<p class="muted">Signed in as {{ user.get_role_display }}.</p>
+
+{% if can_view_pupils %}
+<div class="card">
+  <h2>Pupils</h2>
+  <p>{{ pupil_count }} active pupil{{ pupil_count|pluralize }}.</p>
+  <a href="{% url 'student_list' %}">View pupils</a>
+  {% if can_add_pupils %} · <a href="{% url 'student_add' %}">Add a pupil</a>{% endif %}
+</div>
+{% endif %}
+
+{% if user.is_admin_role %}
+<div class="card">
+  <h2>School setup</h2>
+  <p>Academic years, terms, levels, grades, classes, subjects, grading scales and staff are managed in the <a href="{% url 'admin:index' %}">admin</a>.</p>
+</div>
+{% elif user.is_head %}
+<div class="card">
+  <h2>School overview</h2>
+  <p>You can view all setup and pupil records in the <a href="{% url 'admin:index' %}">admin</a>.</p>
+</div>
+{% elif user.is_teacher %}
+<div class="card">
+  <h2>My classes</h2>
+  <p class="muted">Class lists, attendance and marks entry will appear here.</p>
+</div>
+{% endif %}
+{% endblock %}

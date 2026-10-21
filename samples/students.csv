@@ -1,0 +1,4 @@
+admission_number,first_name,other_names,last_name,gender,date_of_birth,class,guardian_name,guardian_phone,guardian_email,relationship
+2026-001,Chilufya,,Mwansa,F,2016-03-14,4A,Mary Mwansa,0971234567,mary.mwansa@example.com,Mother
+2026-002,Mwila,Joseph,Mwansa,M,2018-07-02,2A,Mary Mwansa,+260 97 123 4567,,Mother
+2026-003,Natasha,,Banda,F,2012-11-25,8A,Peter Banda,0961112233,,Father
