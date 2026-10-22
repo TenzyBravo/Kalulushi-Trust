@@ -2,6 +2,7 @@
 import os
 from pathlib import Path
 
+import dj_database_url
 from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -17,6 +18,13 @@ def env(name, default=None):
 DEBUG = env("DJANGO_DEBUG", "false").lower() in ("1", "true", "yes")
 SECRET_KEY = env("DJANGO_SECRET_KEY", "dev-only-insecure-key" if DEBUG else None)
 ALLOWED_HOSTS = [h for h in env("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h]
+CSRF_TRUSTED_ORIGINS = []
+
+# Render sets this to the service's public hostname, e.g. kalulushi-trust.onrender.com.
+RENDER_EXTERNAL_HOSTNAME = os.environ.get("RENDER_EXTERNAL_HOSTNAME")
+if RENDER_EXTERNAL_HOSTNAME:
+    ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
+    CSRF_TRUSTED_ORIGINS.append(f"https://{RENDER_EXTERNAL_HOSTNAME}")
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -33,6 +41,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -61,8 +70,11 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "config.wsgi.application"
 
+# DATABASE_URL (set by Render) wins; otherwise the individual POSTGRES_* variables.
 DATABASES = {
-    "default": {
+    "default": dj_database_url.parse(os.environ["DATABASE_URL"], conn_max_age=60, conn_health_checks=True)
+    if os.environ.get("DATABASE_URL")
+    else {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": env("POSTGRES_DB", "school_ms"),
         "USER": env("POSTGRES_USER", "school"),
@@ -93,9 +105,16 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
+}
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 if not DEBUG:
+    # Render terminates HTTPS at its proxy and forwards plain HTTP.
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SECURE_SSL_REDIRECT = env("DJANGO_SSL_REDIRECT", "true").lower() == "true"
     SESSION_COOKIE_SECURE = env("DJANGO_SECURE_COOKIES", "true").lower() == "true"
     CSRF_COOKIE_SECURE = SESSION_COOKIE_SECURE
