@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Import learners{% endblock %}
+{% block content %}
+<h1>Import learners from Excel</h1>
+<div class="card">
+  <ol>
+    <li><a href="{% url 'learner_import_template' %}">Download the official template</a>. Its Instructions sheet lists the classes in {{ year|default:"the current year" }}.</li>
+    <li>Fill one row per learner, with their guardian.</li>
+    <li>Upload it here. Nothing is saved until you check the preview and confirm.</li>
+  </ol>
+</div>
+{% if not year %}<div class="danger-zone">No academic year is current. Set one under School setup first.</div>{% endif %}
+<form method="post" enctype="multipart/form-data" class="card">
+  {% csrf_token %}
+  {% include "includes/fields.html" %}
+  <div class="actions"><button class="btn" type="submit">Check file</button></div>
+</form>
+{% endblock %}

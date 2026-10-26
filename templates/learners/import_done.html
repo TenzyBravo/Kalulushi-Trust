@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Import finished{% endblock %}
+{% block content %}
+<h1>Import finished</h1>
+<div class="grid">
+  <div class="card"><div class="stat">{{ result.created|length }}</div><div class="muted">learners registered</div></div>
+  <div class="card"><div class="stat">{{ result.skipped_duplicates|length }}</div><div class="muted">skipped as likely duplicates</div></div>
+  <div class="card"><div class="stat">{{ result.invalid|length }}</div><div class="muted">rows with problems</div></div>
+</div>
+{% if leftover %}<p><a class="btn" href="{% url 'learner_import_errors' %}">Download the rows not imported</a></p>{% endif %}
+{% if result.created %}
+<div class="table-wrap"><table>
+  <thead><tr><th>Line</th><th>Learner number</th><th>Name</th></tr></thead>
+  <tbody>{% for line, l in result.created %}<tr><td>{{ line }}</td><td><a href="{% url 'learner_profile' l.pk %}">{{ l.learner_number }}</a></td><td>{{ l.full_name }}</td></tr>{% endfor %}</tbody>
+</table></div>
+{% endif %}
+{% endblock %}

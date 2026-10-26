@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<h1>{{ title }}</h1>
+{% if intro %}<div class="{% if danger %}danger-zone{% else %}notice{% endif %}">{{ intro }}</div>{% endif %}
+<form method="post" class="card">
+  {% csrf_token %}
+  {% include "includes/fields.html" %}
+  <div class="actions">
+    <button class="btn{% if danger %} danger{% endif %}" type="submit">{% if danger %}Confirm{% else %}Save{% endif %}</button>
+    {% if cancel %}<a href="{{ cancel }}">Cancel</a>{% endif %}
+  </div>
+</form>
+{% endblock %}

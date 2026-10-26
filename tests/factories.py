@@ -1,52 +1,62 @@
 import datetime
 
+from django.contrib.auth.models import Group
+
 from accounts import roles
 from accounts.models import User
-from people.models import Guardian, Staff, Student, StudentGuardian
-from school.models import AcademicYear, ClassGroup, Grade, Level, Subject
+from core.models import School
+from learners import services
+from school.models import AcademicYear, ClassGroup, ClassSubject, Grade, Subject
+
+PASSWORD = "Tested-pass-2026"
 
 
-def make_user(username="user", role=roles.TEACHER, password="pass-12345!"):
-    return User.objects.create_user(username=username, password=password, role=role)
+def school():
+    return School.current()
 
 
-def make_year(name="2026", current=True):
+def make_user(username, *role_names, staff_number=None, email=None):
+    user = User.objects.create_user(username, PASSWORD, staff_number=staff_number or username.upper(), email=email,
+                                    first_name=username.capitalize(), last_name="Test")
+    user.groups.set(Group.objects.filter(name__in=role_names))
+    return user
+
+
+def admin_user():
+    return make_user("sysadmin", roles.SYSTEM_ADMIN)
+
+
+def year(name="2026", status="current"):
     y = int(name)
-    return AcademicYear.objects.create(
-        name=name, start_date=datetime.date(y, 1, 1), end_date=datetime.date(y, 12, 31), is_current=current
+    return AcademicYear.objects.create(school=school(), name=name, start_date=datetime.date(y, 1, 1),
+                                       end_date=datetime.date(y, 12, 31), status=status)
+
+
+def grade(code):
+    return Grade.objects.get(school=school(), code=code)
+
+
+def make_class(code, stream="A", academic_year=None):
+    return ClassGroup.objects.create(school=school(), academic_year=academic_year or AcademicYear.current(),
+                                     grade=grade(code), stream=stream)
+
+
+def subject(stage_code="1", name="Mathematics", code="MATH"):
+    return Subject.objects.create(school=school(), stage=grade(stage_code).stage, name=name, code=code)
+
+
+def class_subject(class_group, subj):
+    return ClassSubject.objects.create(class_group=class_group, subject=subj)
+
+
+def registration(class_group, first="Chilufya", last="Mwansa", dob=datetime.date(2016, 3, 14), phone="0971234567",
+                 guardian="Mary Mwansa", start=datetime.date(2026, 1, 15), existing=None):
+    return services.Registration(
+        first_name=first, last_name=last, date_of_birth=dob, gender="F", class_group=class_group, start_date=start,
+        guardian=services.GuardianInput(guardian, phone, "Mother", existing=existing),
     )
 
 
-def make_structure():
-    """Primary (Grades 1-7) and Secondary (Grade 8) with classes 2A, 4A, 8A in 2026."""
-    primary = Level.objects.create(name="Primary", order=1)
-    secondary = Level.objects.create(name="Secondary", order=2)
-    grades = {n: Grade.objects.create(level=primary, name=f"Grade {n}", code=str(n), order=n) for n in range(1, 8)}
-    grades[8] = Grade.objects.create(level=secondary, name="Grade 8", code="8", order=8)
-    year = make_year()
-    classes = {
-        f"{n}A": ClassGroup.objects.create(grade=grades[n], academic_year=year, stream="A") for n in (2, 4, 8)
-    }
-    return {"primary": primary, "secondary": secondary, "grades": grades, "year": year, "classes": classes}
-
-
-def make_student(adm="2026-001", first="Chilufya", last="Mwansa", gender="F"):
-    return Student.objects.create(admission_number=adm, first_name=first, last_name=last, gender=gender)
-
-
-def make_guardian(phone="0971234567", name="Mary Mwansa"):
-    return Guardian.objects.create(full_name=name, phone=phone)
-
-
-def link(student, guardian, primary=False, receives_results=True):
-    return StudentGuardian.objects.create(
-        student=student, guardian=guardian, is_primary=primary, receives_results=receives_results
-    )
-
-
-def make_staff(number="T001", user=None):
-    return Staff.objects.create(staff_number=number, first_name="Grace", last_name="Phiri", user=user)
-
-
-def make_subject(level, name="Mathematics", code="MATH"):
-    return Subject.objects.create(level=level, name=name, code=code)
+def register(actor, class_group, **kwargs):
+    reason = kwargs.pop("override_reason", "")
+    return services.register_learner(registration(class_group, **kwargs), actor, override_reason=reason)
