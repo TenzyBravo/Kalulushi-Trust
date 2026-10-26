@@ -3,6 +3,20 @@
 School back office: roles, school structure, pupils and their guardians.
 Attendance, results and SMS/email delivery will build on this.
 
+## Deploy on Render
+
+The repo includes a Render Blueprint (`render.yaml`) that creates the web service
+and a PostgreSQL database.
+
+1. In Render: **New > Blueprint**, connect GitHub and pick this repository.
+2. Fill in `DJANGO_SUPERUSER_USERNAME`, `DJANGO_SUPERUSER_EMAIL` and
+   `DJANGO_SUPERUSER_PASSWORD`. The first deploy creates that Admin account.
+3. Click **Apply**. Each push to `main` redeploys: `build.sh` installs packages,
+   collects static files and runs migrations.
+
+The site is served at `https://<service-name>.onrender.com`. Free plans sleep when idle,
+and Render's free database expires after a time limit, so move to paid plans before real data goes in.
+
 ## Run locally
 
 Needs Python 3.12+ and PostgreSQL 14+.
@@ -21,7 +35,8 @@ python manage.py runserver
 |---|---|
 | `DJANGO_SECRET_KEY` | required unless `DJANGO_DEBUG=true` |
 | `DJANGO_DEBUG` | `false` |
-| `DJANGO_ALLOWED_HOSTS` | `localhost,127.0.0.1` |
+| `DJANGO_ALLOWED_HOSTS` | `localhost,127.0.0.1` (Render's hostname is added automatically) |
+| `DATABASE_URL` | unset; when set (Render does this) it replaces the `POSTGRES_*` variables |
 | `POSTGRES_DB` / `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_HOST` / `POSTGRES_PORT` | `school_ms` / `school` / empty / `localhost` / `5432` |
 
 ## Roles

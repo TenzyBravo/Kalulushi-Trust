@@ -1,0 +1,37 @@
+# Render Blueprint: a web service and a PostgreSQL database.
+# In Render: New > Blueprint, pick this repo, then fill in the values marked sync: false.
+databases:
+  - name: kalulushi-db
+    databaseName: school_ms
+    user: school
+    plan: free
+    region: frankfurt
+
+services:
+  - type: web
+    name: kalulushi-trust
+    runtime: python
+    plan: free
+    region: frankfurt
+    branch: main
+    buildCommand: ./build.sh
+    startCommand: gunicorn config.wsgi:application
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      - key: DATABASE_URL
+        fromDatabase:
+          name: kalulushi-db
+          property: connectionString
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DJANGO_DEBUG
+        value: "false"
+      - key: WEB_CONCURRENCY
+        value: "2"
+      - key: DJANGO_SUPERUSER_USERNAME
+        sync: false
+      - key: DJANGO_SUPERUSER_EMAIL
+        sync: false
+      - key: DJANGO_SUPERUSER_PASSWORD
+        sync: false
