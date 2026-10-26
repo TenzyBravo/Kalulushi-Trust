@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Import preview{% endblock %}
+{% block content %}
+<h1>Check the import</h1>
+<div class="grid">
+  <div class="card"><div class="stat">{{ preview.valid|length }}</div><div class="muted">ready to import</div></div>
+  <div class="card"><div class="stat">{{ preview.flagged|length }}</div><div class="muted">of those look like existing learners</div></div>
+  <div class="card"><div class="stat">{{ preview.invalid|length }}</div><div class="muted">have problems and won't be imported</div></div>
+</div>
+{% if preview.invalid or preview.flagged %}<p><a href="{% url 'learner_import_errors' %}">Download the rows that need attention</a>, fix them, and upload that file again after this import.</p>{% endif %}
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Line</th><th>Learner</th><th>Class</th><th>Guardian</th><th>Check</th></tr></thead>
+  <tbody>{% for row in preview.rows %}
+    <tr>
+      <td>{{ row.line }}</td>
+      <td>{{ row.name|default:"—" }}{% if row.raw.date_of_birth %}<div class="muted small">{{ row.raw.date_of_birth }}</div>{% endif %}</td>
+      <td>{{ row.raw.class }}</td>
+      <td>{{ row.raw.guardian_name }}<div class="muted small">{{ row.raw.guardian_phone }}{% if row.guardian_note %} · {{ row.guardian_note }}{% endif %}</div></td>
+      <td>
+        {% if row.errors %}<span class="tag bad">won't import</span><ul class="errorlist">{% for e in row.errors %}<li>{{ e }}</li>{% endfor %}</ul>
+        {% elif row.duplicates %}<span class="tag warn">likely duplicate</span><div class="small">{% for number, name, why in row.duplicates %}{{ name }} {{ number }} — {{ why }}<br>{% endfor %}</div>
+        {% else %}<span class="tag ok">ok</span>{% endif %}
+      </td>
+    </tr>{% endfor %}</tbody>
+</table></div>
+
+{% if preview.valid %}
+<form method="post" class="card" style="margin-top:1rem">
+  {% csrf_token %}
+  {% if preview.flagged %}
+    {% if can_override %}{% include "includes/fields.html" %}
+    {% else %}<p>Rows flagged as likely duplicates will be skipped. Only a Headteacher, System Administrator or Academic Administrator can import them.</p>{% endif %}
+  {% endif %}
+  <div class="actions">
+    <button class="btn" type="submit">Import {{ preview.valid|length }} learner{{ preview.valid|length|pluralize }}</button>
+    <a href="{% url 'learner_import' %}">Upload a different file</a>
+  </div>
+</form>
+{% else %}
+<div class="actions"><a class="btn" href="{% url 'learner_import' %}">Upload a corrected file</a></div>
+{% endif %}
+{% endblock %}

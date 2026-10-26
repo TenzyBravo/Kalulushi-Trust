@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Staff{% endblock %}
+{% block content %}
+<h1>Staff</h1>
+<div class="actions">
+  {% if can_manage %}<a class="btn" href="{% url 'staff_create' %}">New staff account</a>{% endif %}
+  <a href="?show=active"{% if show != "inactive" %} style="font-weight:600"{% endif %}>Active</a> ·
+  <a href="?show=inactive"{% if show == "inactive" %} style="font-weight:600"{% endif %}>Deactivated</a>
+</div>
+<div class="table-wrap"><table>
+  <thead><tr><th>Staff number</th><th>Name</th><th>Username</th><th>Roles</th></tr></thead>
+  <tbody>{% for u in users %}
+    <tr><td>{{ u.staff_number }}</td><td><a href="{% url 'staff_detail' u.pk %}">{{ u }}</a></td><td>{{ u.username }}</td>
+      <td>{% for r in u.role_names %}<span class="tag">{{ r }}</span> {% empty %}<span class="muted">—</span>{% endfor %}</td></tr>
+  {% empty %}<tr><td colspan="4" class="muted">None.</td></tr>{% endfor %}</tbody>
+</table></div>
+{% endblock %}

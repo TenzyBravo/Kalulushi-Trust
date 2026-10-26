@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Audit log{% endblock %}
+{% block content %}
+<h1>Audit log</h1>
+<form method="get" class="card inline-form">
+  <div><label for="action">Action starts with</label><input id="action" name="action" value="{{ action }}" placeholder="e.g. learner. or user.deactivate"></div>
+  <div><label for="who">By (username)</label><input id="who" name="who" value="{{ who }}"></div>
+  <div><label for="object">Record</label><input id="object" name="object" value="{{ object }}" placeholder="e.g. learner:12"></div>
+  <button class="btn" type="submit">Filter</button>
+</form>
+<div class="table-wrap"><table>
+  <thead><tr><th>When</th><th>Who</th><th>Action</th><th>Record</th><th>Changes</th><th>Reason</th></tr></thead>
+  <tbody>{% for log in page %}
+    <tr><td class="small">{{ log.occurred_at|date:"j M Y H:i" }}</td><td>{{ log.actor|default:"system" }}</td><td>{{ log.action }}</td>
+      <td class="small">{% if log.object_type %}<a href="?object={{ log.object_type }}:{{ log.object_id }}">{{ log.object_type }}:{{ log.object_id }}</a>{% endif %}</td>
+      <td class="small">{% for k, v in log.changes.items %}<div><strong>{{ k }}</strong>: {% if v.0 is not None %}{{ v.0 }} → {% endif %}{{ v.1 }}</div>{% endfor %}</td>
+      <td class="small">{{ log.reason }}</td></tr>
+  {% empty %}<tr><td colspan="6" class="muted">Nothing recorded.</td></tr>{% endfor %}</tbody>
+</table></div>
+<div class="actions">{% if page.has_previous %}<a href="?page={{ page.previous_page_number }}&action={{ action }}&who={{ who }}&object={{ object }}">Newer</a>{% endif %}
+  <span class="muted">Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
+  {% if page.has_next %}<a href="?page={{ page.next_page_number }}&action={{ action }}&who={{ who }}&object={{ object }}">Older</a>{% endif %}</div>
+{% endblock %}

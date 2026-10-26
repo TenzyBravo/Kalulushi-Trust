@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Add a guardian{% endblock %}
+{% block content %}
+<h1>Add a guardian for {{ learner.full_name }}</h1>
+<form method="post" class="card">
+  {% csrf_token %}
+  {% if guardian_suggestions %}
+  <div class="notice">
+    <strong>This mobile number is already used by:</strong>
+    {% for g in guardian_suggestions %}<label style="font-weight:normal"><input type="radio" name="guardian_choice" value="{{ g.pk }}" required> Link existing guardian <strong>{{ g.full_name }}</strong></label>{% endfor %}
+    <label style="font-weight:normal"><input type="radio" name="guardian_choice" value="new" required> Create a new guardian</label>
+  </div>
+  {% endif %}
+  {% include "includes/fields.html" %}
+  <div class="actions"><button class="btn" type="submit">Save</button> <a href="{% url 'learner_profile' learner.pk %}?tab=guardians">Cancel</a></div>
+</form>
+{% endblock %}
