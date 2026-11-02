@@ -1,6 +1,7 @@
 """Settings for the Kalulushi Trust school system. Environment-specific values come from env vars."""
 import os
 from pathlib import Path
+from urllib.parse import unquote, urlparse
 
 from django.core.exceptions import ImproperlyConfigured
 
@@ -17,6 +18,11 @@ def env(name, default=None):
 DEBUG = env("DJANGO_DEBUG", "false").lower() in ("1", "true", "yes")
 SECRET_KEY = env("DJANGO_SECRET_KEY", "dev-only-insecure-key" if DEBUG else None)
 ALLOWED_HOSTS = [h for h in env("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h]
+CSRF_TRUSTED_ORIGINS = [o for o in env("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",") if o]
+# Render sets this to the service's public hostname.
+if render_host := os.environ.get("RENDER_EXTERNAL_HOSTNAME"):
+    ALLOWED_HOSTS.append(render_host)
+    CSRF_TRUSTED_ORIGINS.append(f"https://{render_host}")
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -36,6 +42,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -71,17 +78,27 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "config.wsgi.application"
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
+def _database():
+    """DATABASE_URL (as hosting providers give it) wins over the separate POSTGRES_* variables."""
+    if url := os.environ.get("DATABASE_URL"):
+        parts = urlparse(url)
+        return {
+            "NAME": parts.path.lstrip("/"),
+            "USER": unquote(parts.username or ""),
+            "PASSWORD": unquote(parts.password or ""),
+            "HOST": parts.hostname or "",
+            "PORT": str(parts.port or 5432),
+        }
+    return {
         "NAME": env("POSTGRES_DB", "school_ms"),
         "USER": env("POSTGRES_USER", "school"),
         "PASSWORD": env("POSTGRES_PASSWORD", ""),
         "HOST": env("POSTGRES_HOST", "localhost"),
         "PORT": env("POSTGRES_PORT", "5432"),
-        "CONN_MAX_AGE": 60,
     }
-}
+
+
+DATABASES = {"default": {"ENGINE": "django.db.backends.postgresql", "CONN_MAX_AGE": 60, **_database()}}
 
 AUTH_USER_MODEL = "accounts.User"
 
@@ -103,6 +120,14 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"
+        if DEBUG
+        else "whitenoise.storage.CompressedManifestStaticFilesStorage"
+    },
+}
 MEDIA_URL = "media/"
 MEDIA_ROOT = Path(env("DJANGO_MEDIA_ROOT", str(BASE_DIR / "media")))
 
@@ -111,3 +136,13 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 if not DEBUG:
     SESSION_COOKIE_SECURE = env("DJANGO_SECURE_COOKIES", "true").lower() == "true"
     CSRF_COOKIE_SECURE = SESSION_COOKIE_SECURE
+    # Behind the host's HTTPS proxy (e.g. Render), which sets X-Forwarded-Proto.
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SECURE_HSTS_SECONDS = int(env("DJANGO_HSTS_SECONDS", "0"))
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {"console": {"class": "logging.StreamHandler"}},
+    "root": {"handlers": ["console"], "level": "WARNING"},
+}

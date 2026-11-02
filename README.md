@@ -96,6 +96,23 @@ python manage.py test tests
 The tests need PostgreSQL: most of the rules they check are database constraints. GitHub Actions
 runs them on every push (`.github/workflows/tests.yml`).
 
+## Deploy to Render
+
+`render.yaml` describes the web app and a PostgreSQL 16 database, both in Frankfurt and both on
+the free plan to start.
+
+1. Merge into `main` (the Blueprint deploys `main`).
+2. In the Render dashboard: **New → Blueprint**, choose this repository.
+3. Fill in the variables it asks for: `DJANGO_SUPERUSER_USERNAME`, `DJANGO_SUPERUSER_PASSWORD`,
+   `DJANGO_SUPERUSER_STAFF_NUMBER`, `DJANGO_SUPERUSER_FIRST_NAME`, `DJANGO_SUPERUSER_LAST_NAME`.
+4. Apply. Each deploy runs `bin/build.sh`: install, collect static files, migrate, `setup_school`
+   (school, grades, and the year in `SCHOOL_YEAR`), and create that first System Administrator if missing.
+5. Sign in at the service's `onrender.com` address and change the administrator's password.
+
+Before real learner data goes in: move the database off the free plan (free databases expire after
+30 days and have no backups), and keep uploaded files (the school logo) on a persistent disk or
+object storage, because the free web service's disk is wiped on every deploy.
+
 ## Production notes
 
 - The audit log refuses `UPDATE` and `DELETE` through a trigger. For defence in depth, also revoke
