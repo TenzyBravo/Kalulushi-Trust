@@ -24,6 +24,35 @@
   {% endif %}
 </div>
 
+{% if extra_permissions %}
+<h2 id="permissions">Extra permissions</h2>
+<p class="muted small">On top of {{ person.role_names|join:", "|default:"their roles" }}. Every change is recorded in the audit log with its reason.
+  <a href="{% url 'permission_list' %}">See all permissions</a></p>
+<div class="table-wrap card flush"><table class="perm-table">
+  <thead><tr><th>Permission</th><th>Has it</th><th></th></tr></thead>
+  <tbody>{% for p in extra_permissions %}
+    <tr>
+      <td class="perm-name">{{ p.label }}{% if p.sensitive %} <span class="perm-shield" title="Sensitive">{% include "icons.html" with name="shield" %}</span>{% endif %}
+        <div class="perm-desc">{{ p.description }}</div></td>
+      <td>{% if p.via_role %}<span class="perm-badge view">Through role</span>{% elif p.direct %}<span class="perm-badge create">Granted</span>{% else %}<span class="muted">No</span>{% endif %}</td>
+      <td>{% if p.can_change and not p.via_role %}
+        <form method="post" action="{% url 'staff_permission' person.pk %}" class="inline-form">{% csrf_token %}
+          <input type="hidden" name="code" value="{{ p.code }}">
+          {% if p.direct %}
+            <input type="hidden" name="action" value="revoke">
+            <input type="text" name="reason" placeholder="Reason (optional)" aria-label="Reason">
+            <button class="btn small danger" type="submit">Remove</button>
+          {% else %}
+            <input type="hidden" name="action" value="grant">
+            <input type="text" name="reason" placeholder="Reason" required aria-label="Reason for granting">
+            <button class="btn small" type="submit">Grant</button>
+          {% endif %}
+        </form>{% endif %}</td>
+    </tr>
+  {% endfor %}</tbody>
+</table></div>
+{% endif %}
+
 <h2>Teaching assignments</h2>
 <div class="table-wrap"><table>
   <thead><tr><th>Class</th><th>Subject</th><th>Type</th><th>From</th><th>To</th><th>Status</th></tr></thead>

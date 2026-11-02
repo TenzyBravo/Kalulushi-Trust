@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Permissions{% endblock %}
+{% block content %}
+<p class="section-eyebrow">Who can do what</p>
+<h1 class="section-title">Permissions</h1>
+<p class="section-intro">Each role's permissions are set in the system's code and reviewed like any other change.
+Permissions marked <span class="perm-badge grantable">individual</span> can also be given to one person from their staff page.
+No role can delete records: they end by status, and the history is kept.</p>
+
+{% for module, rows in modules %}
+<section class="perm-card">
+  <h2 class="perm-title">{% include "icons.html" with name="key" %} {{ module }}</h2>
+  <div class="table-wrap"><table class="perm-table">
+    <thead><tr><th>Permission</th><th>Code</th><th>Type</th><th>Description</th><th>Roles</th></tr></thead>
+    <tbody>{% for p in rows %}
+      <tr>
+        <td class="perm-name">{{ p.label }}{% if p.sensitive %} <span class="perm-shield" title="Sensitive">{% include "icons.html" with name="shield" %}</span>{% endif %}
+          {% if p.grantable %}<span class="perm-badge grantable">individual</span>{% endif %}</td>
+        <td><code class="perm-code">{{ p.code }}</code></td>
+        <td>{% if p.sensitive %}<span class="perm-badge sensitive">{% include "icons.html" with name="shield" %} Sensitive</span>
+            {% else %}<span class="perm-badge {{ p.kind }}">{{ p.kind_label }}</span>{% endif %}</td>
+        <td class="perm-desc">{{ p.description|default:"—" }}</td>
+        <td><div class="perm-roles">{% for r in p.roles %}<span class="perm-role">{{ r }}</span>{% empty %}<span class="muted">—</span>{% endfor %}
+          {% if p.individuals %}<span class="perm-role individual">+ {{ p.individuals }} individual{{ p.individuals|pluralize }}</span>{% endif %}</div></td>
+      </tr>
+    {% endfor %}</tbody>
+  </table></div>
+</section>
+{% endfor %}
+{% endblock %}

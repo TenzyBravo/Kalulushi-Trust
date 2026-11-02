@@ -121,6 +121,25 @@
     .explore-name { color:var(--muted); font-size:.9rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .explore-chevron { font-size:1.6rem; color:#6b7a85; line-height:1; }
 
+    /* Permissions */
+    .perm-card { background:#fff; border-radius:18px; box-shadow:0 2px 12px #0f2f4c10; margin-bottom:1.5rem; overflow:hidden; }
+    .perm-title { display:flex; gap:.5rem; align-items:center; margin:0; padding:1.1rem 1.5rem; font-family:var(--serif); font-weight:400; font-size:1.3rem; color:var(--navy); border-bottom:1px solid var(--line); }
+    .perm-card .table-wrap { padding:.5rem 1.5rem 1rem; }
+    .perm-table th { font-size:.72rem; letter-spacing:.12em; text-transform:uppercase; color:#5b6b75; border-bottom:2px solid var(--ink); }
+    .perm-table td { padding:.6rem .5rem; vertical-align:middle; }
+    .perm-table tbody tr:hover td { background:#f1faf5; }
+    .perm-name { font-weight:700; }
+    .perm-code { font-family:ui-monospace, "Cascadia Mono", Consolas, monospace; font-size:.85rem; color:#13804f; background:none; }
+    .perm-desc { color:var(--muted); font-size:.88rem; font-weight:400; }
+    .perm-shield { color:#d32f2f; }
+    .perm-badge { display:inline-flex; gap:.25rem; align-items:center; padding:.15rem .7rem; border-radius:999px; font-size:.8rem; font-weight:700; white-space:nowrap; background:#6b7680; color:#fff; }
+    .perm-badge.view { background:#19c3e6; } .perm-badge.create { background:#1d8a55; } .perm-badge.edit { background:#f5c518; color:#3d2e00; }
+    .perm-badge.admin { background:#1d2328; } .perm-badge.sensitive { background:#d63a3a; } .perm-badge.import, .perm-badge.export { background:#6b7680; }
+    .perm-badge.grantable { background:#eef2f4; color:var(--muted); font-weight:600; font-size:.72rem; margin-left:.25rem; }
+    .perm-roles { display:flex; flex-wrap:wrap; gap:.25rem; }
+    .perm-role { display:inline-block; padding:.1rem .55rem; border-radius:999px; background:#e3f5ea; color:#127a46; font-size:.78rem; font-weight:700; white-space:nowrap; }
+    .perm-role.individual { background:#fff1d6; color:#9a5b00; }
+
     /* Attendance */
     .att-tag { display:inline-block; padding:.05rem .5rem; border-radius:999px; font-size:.8rem; font-weight:700; background:#eef2f4; color:var(--muted); }
     .att-tag.present { background:#e3f5ea; color:#127a46; } .att-tag.absent { background:#fde4e4; color:#b42318; }

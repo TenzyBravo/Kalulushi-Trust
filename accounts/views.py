@@ -13,7 +13,7 @@ from school.models import AcademicYear
 from staffing import access
 from staffing.models import ClassTeacherAssignment, CoverAuthorization, TeacherAssignment
 
-from . import roles, services
+from . import permission_catalogue, roles, services
 from .forms import PasswordResetForm, ReasonForm, StaffForm
 from .models import User, UserSession
 
@@ -112,12 +112,54 @@ def staff_create(request):
 @permission_required("accounts.view_user", raise_exception=True)
 def staff_detail(request, pk):
     person = get_object_or_404(User, pk=pk)
+    can_manage = request.user.has_perm("accounts.manage_staff") and roles.can_manage(request.user, person)
+    extra = []
+    if can_manage or request.user.pk == person.pk:
+        direct = {permission_catalogue.code_of(p) for p in person.user_permissions.select_related("content_type")}
+        for code in permission_catalogue.GRANTABLE:
+            permission = permission_catalogue.get_permission(code)
+            extra.append({
+                "code": code, "label": permission_catalogue.label_of(permission),
+                "description": permission_catalogue.DESCRIPTIONS.get(code, ""),
+                "sensitive": code in permission_catalogue.SENSITIVE,
+                "direct": code in direct, "via_role": services.role_grants(person, code),
+                "can_change": can_manage and request.user.has_perm(code),
+            })
     return render(request, "staff/detail.html", {
         "person": person,
-        "can_manage": request.user.has_perm("accounts.manage_staff") and roles.can_manage(request.user, person),
+        "extra_permissions": extra,
+        "can_manage": can_manage,
         "sessions": UserSession.objects.filter(user=person),
         "assignments": person.teacher_assignments.select_related("class_subject__class_group", "class_subject__subject").order_by("status", "-start_date"),
         "class_teacher": person.class_teacher_assignments.select_related("class_group"),
+    })
+
+
+@login_required
+@permission_required("accounts.manage_staff", raise_exception=True)
+@require_POST
+def staff_permission(request, pk):
+    """Grant or remove one extra permission; every change is audited with its reason."""
+    person = get_object_or_404(User, pk=pk)
+    code, action, reason = request.POST.get("code", ""), request.POST.get("action"), request.POST.get("reason", "")
+    try:
+        if action == "grant":
+            services.grant_permission(request.user, person, code, reason)
+            messages.success(request, f"{person} can now: {code.split('.', 1)[1].replace('_', ' ')}.")
+        elif action == "revoke":
+            services.revoke_permission(request.user, person, code, reason)
+            messages.success(request, f"Removed {code.split('.', 1)[1].replace('_', ' ')} from {person}.")
+    except (PermissionDenied, ValidationError) as exc:
+        messages.error(request, exc.messages[0] if isinstance(exc, ValidationError) else (str(exc) or "Not allowed."))
+    return redirect(f"{reverse('staff_detail', args=[person.pk])}#permissions")
+
+
+@login_required
+@permission_required("accounts.view_user", raise_exception=True)
+def permission_list(request):
+    return render(request, "staff/permissions.html", {
+        "modules": permission_catalogue.catalogue(), "roles": roles.ALL_ROLES,
+        "type_labels": permission_catalogue.TYPE_LABELS,
     })
 
 

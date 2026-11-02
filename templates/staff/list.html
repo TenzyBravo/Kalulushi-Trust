@@ -4,6 +4,7 @@
 <h1>Staff</h1>
 <div class="actions">
   {% if can_manage %}<a class="btn" href="{% url 'staff_create' %}">New staff account</a>{% endif %}
+  <a class="btn secondary" href="{% url 'permission_list' %}">{% include "icons.html" with name="key" %} Permissions</a>
   <a href="?show=active"{% if show != "inactive" %} style="font-weight:600"{% endif %}>Active</a> ·
   <a href="?show=inactive"{% if show == "inactive" %} style="font-weight:600"{% endif %}>Deactivated</a>
 </div>
