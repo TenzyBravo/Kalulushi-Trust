@@ -1,7 +1,7 @@
 # Database Design — Slice 2: Calendar, Attendance and Absence Follow-up
 
-**Status:** Draft for review — decisions A1–A7 need answers\
-**Version:** 0.1\
+**Status:** Approved — decisions A1–A7 answered 2 November 2026, with grade and class register closures added (§3.1)\
+**Version:** 1.0\
 **Date:** 2 November 2026\
 **Implements:** Requirements baseline v1.1, §6 (attendance, school calendar, absence early warning,
 absenteeism follow-up screen), §12 screens 6–7, §13 "Attendance and follow-up"\
@@ -14,7 +14,7 @@ rule first.
 
 | Area | Tables |
 |---|---|
-| School calendar | `calendar_events` |
+| School calendar | `calendar_events` (school-wide, grade or class) |
 | Daily attendance | `attendance_sessions`, `attendance_records` |
 | Absence follow-up | `absence_cases`, `absence_case_records`, `follow_up_actions` |
 
@@ -29,7 +29,7 @@ reports and exports (slice 6).
 
 ## 2. How a day works
 
-1. The teacher opens **My classes**, picks a class, and sees today's register. The date can be
+1. The class teacher opens **My classes**, picks their class, and sees today's register. The date can be
    changed to fill in a missed day (§5.3 limits how far back).
 2. A new register starts with **nobody marked** (decision A3). **Mark all present** marks everyone
    Present; the teacher then taps the exceptions: Absent, Late or Excused, with an optional note.
@@ -52,11 +52,16 @@ The calendar stores only exceptions. Terms already say when school is in session
 | `school_id` | FK | |
 | `academic_year_id` | FK | |
 | `kind` | text | `holiday` \| `closure` \| `extra_school_day` |
+| `grade_id` | FK → `grades`, null | set for a closure that applies to one grade only (§3.1) |
+| `class_group_id` | FK → `classes`, null | set for a closure that applies to one class only (§3.1) |
 | `name` | text | required, e.g. `Heroes Day`, `Water cut — school closed`, `Saturday catch-up` |
 | `start_date`, `end_date` | date | `CHECK (end_date >= start_date)`; one-day events have equal dates |
 | `reason` | text | required for `closure` |
 | `created_by` | FK → `users` | |
 | `created_at`, `updated_at` | timestamptz | |
+| | | `CHECK (grade_id IS NULL OR class_group_id IS NULL)`: a closure is school-wide, for a grade, or for a class |
+| | | `CHECK (kind = 'closure' OR (grade_id IS NULL AND class_group_id IS NULL))`: holidays and extra school days are always school-wide |
+| | | `end_date` may be null only for a grade or class closure, meaning "until the end of the term": `CHECK (end_date IS NOT NULL OR grade_id IS NOT NULL OR class_group_id IS NOT NULL)` |
 
 **A school day** is a date that:
 
@@ -64,13 +69,33 @@ The calendar stores only exceptions. Terms already say when school is in session
 - is either a weekday (Monday–Friday) not covered by a `holiday` or `closure`, **or** is covered by
   an `extra_school_day`.
 
-This is one function (`calendar.is_school_day(date)`) used by the register, the absence check and
+A **register day for a class** is a school day not covered by a closure for that class's grade or
+for the class itself.
+
+These are two functions, `calendar.is_school_day(date)` and `calendar.is_register_day(date,
+class_group)`, used by the register, the absence check and
 later reports. Events must fall inside their academic year; that spans two tables, so it is
 checked by the application and covered by tests. A seed command adds Zambia's fixed public
 holidays for a year; movable ones (Easter) are entered in School setup.
 
-Closures apply to the whole school. Closures for one grade only (for example during Form 4
-exams) are deferred; see §9.
+### 3.1 Closing a grade's or class's register early
+
+Exam classes often finish before the rest of the school, especially in Term 3: Grade 7 and Form 4
+may close after their final exam while other grades keep coming. Staff record this as a
+**closure for that grade or class**, usually from the day after the last exam with no end date
+("until the end of the term").
+
+From the closure's start date, for that grade or class only:
+
+- no register can be taken (the screen says the register is closed and why);
+- those days do not count towards absence runs (§5.1);
+- the class does not appear on the "registers not taken" list;
+- registers taken before the closure are unchanged.
+
+Other grades and classes are unaffected. A closure can be ended early by setting its end date, for
+example if a class is recalled. Creating, changing or ending a closure is audited and allowed only
+to the roles in decision A6. Every register date falls in one term, and an open-ended closure lasts
+only to the end of its term, so a Term 3 closure never carries into the next year.
 
 ## 4. Daily attendance
 
@@ -129,10 +154,15 @@ Checked by one access function, `staffing.access.can_take_register(user, class_g
 | Who | Today and recent days (§5.3) | Older registers |
 |---|---|---|
 | Class teacher of that class on that date | take and edit | view |
-| Teacher with live cover that includes `attendance` for a subject of that class | take and edit | view |
-| Subject teacher (primary assignment) without cover | view | view |
-| Headteacher, Academic Administrator | take and edit | correct, with a reason |
-| System Administrator | take and edit | correct, with a reason |
+| Subject teacher of that class, or a teacher with cover | view | view |
+| Headteacher, Academic Administrator, System Administrator | view | correct, with a reason (including entering a register the class teacher missed) |
+
+Only the class teacher takes the register (decision A2). When a class teacher is away, the school
+makes a **temporary class-teacher assignment** for those dates (slice 1's
+`class_teacher_assignments` already have start and end dates), or the class teacher fills in the
+missed days on return within the back-fill window (§5.3). The `attendance` cover duty from slice 1
+therefore grants nothing in this slice; it stays available should the school later want cover
+teachers to take registers.
 
 ### 4.2 Corrections
 
@@ -148,10 +178,10 @@ updated in place; the audit log holds the history.
 A learner is flagged when they are marked **Absent on two consecutive school days**:
 
 - Only `absent` counts. `late` and `excused` break the run, because the learner is accounted for.
-- "Consecutive" means consecutive **school days on which the learner's class has a register**.
+- "Consecutive" means consecutive **register days (§3) on which the learner's class has a register**.
   A school day with no register neither extends nor breaks the run (decision A4), and shows up on
   the Headteacher's "registers not taken" list instead.
-- Weekends, holidays and closures never count, as the baseline requires.
+- Weekends, holidays and closures (school-wide, grade or class) never count, as the baseline requires.
 
 The check runs in the same transaction as the register save, for the saved date. Back-filling or
 correcting an older register re-checks that learner around that date. If a correction removes an
@@ -183,8 +213,8 @@ resolves it. A new run of absences after resolution opens a new case.
 
 | From | To | Who |
 |---|---|---|
-| new | follow_up_pending, in_progress, resolved, escalated | assigned teacher, Headteacher |
-| follow_up_pending, in_progress | each other, resolved, escalated | assigned teacher, Headteacher |
+| new | follow_up_pending, in_progress, resolved, escalated | assigned teacher, Headteacher, Academic Administrator |
+| follow_up_pending, in_progress | each other, resolved, escalated | assigned teacher, Headteacher, Academic Administrator |
 | escalated | in_progress, resolved | Headteacher |
 | resolved | — (final; a new run opens a new case) | |
 
@@ -236,23 +266,24 @@ New permissions, added to the role mapping in `accounts/roles.py`:
 
 | Action | Sys Admin | Headteacher | Academic Admin | Teacher |
 |---|---|---|---|---|
-| Manage calendar | yes | add closures (decision A6) | yes | view |
-| Take or edit a register | any class | any class | any class | per §4.1 |
-| Correct an older register | yes, with reason | yes, with reason | yes, with reason | — |
+| Manage calendar (holidays, extra school days) | yes | view | yes | view |
+| Add or end closures (school, grade or class) | yes | yes | yes | — |
+| Take or edit a register | — | — | — | class teacher only, per §4.1 |
+| Correct a register, with a reason | yes | yes | yes | — |
 | View attendance | all | all | all | classes they can see |
-| Work on absence cases | all | all, plus escalations | view only (decision A5) | cases in their classes |
+| Work on absence cases | all | all, plus escalations | all (decision A5) | cases in their class |
 
 ## 7. Screens
 
-1. **Class register** (from the agreed design). Class and date at the top; one row per learner
-   with name, learner number and large P / A / L / E buttons that work on a phone; **Add note**
+1. **Class register** (from the agreed design, without the M button). Class and date at the top;
+   one row per learner with name, learner number and large P / A / L / E buttons that work on a phone; **Add note**
    under each row; search by name or number and filter by status; a fixed bottom bar with
    **Mark all present**, **Cancel** and **Save changes**. **Edit roster** is shown only to roles
    that manage enrollments and opens the class's learner list.
-2. **My classes.** The registers this user can take today: taken, not yet taken, or a non-school
-   day.
-3. **Attendance overview** (Headteacher and administrators). Today's registers by class, taken or
-   not; one click into any register.
+2. **My classes.** The class teacher's register for today: taken, not yet taken, a non-school day,
+   or closed (with the closure's reason).
+3. **Attendance overview** (Headteacher and administrators). Today's registers by class: taken,
+   not taken, or closed; one click into any register.
 4. **Absence follow-up**, the dedicated screen. Teachers see open cases in their classes. The
    Headteacher sees all cases, with escalated and long-outstanding ones first. Filters: status,
    class, date flagged, assigned teacher. A case shows recent attendance, the history, and forms to
@@ -260,7 +291,8 @@ New permissions, added to the role mapping in `accounts/roles.py`:
 5. **Learner profile → Attendance** tab (the placeholder slice 1 left): term summary and day list.
    **Learner profile → Absence follow-up** tab: that learner's cases, reading and writing the same
    records as screen 4.
-6. **School setup → Calendar**: terms with their holidays, closures and extra school days.
+6. **Calendar**: terms with their holidays, closures and extra school days, and a **Close a grade or
+   class** form (grade or class, from date, optional end date, reason).
 
 The home dashboard gains three "Waiting on you" items: registers not taken today, new absence
 cases, and escalated cases (Headteacher).
@@ -269,17 +301,16 @@ cases, and escalated cases (Headteacher).
 
 | # | Decision | Recommendation | Why |
 |---|---|---|---|
-| A1 | Statuses. The baseline lists Present, Absent, Late, Excused. The register design also shows **M**. | **Need your answer: what does M mean?** If it is *Medical* (sick, often with a note), add `medical`: it counts as accounted for, like Excused, but reports can count illness separately. If it means something else, tell us and we will place it. Otherwise keep the four. | The status list must match what teachers already use. One row in the shared design shows no M, which suggests M applies only to some learners; we need to know when. |
-| A2 | Who may take the register? | **Class teacher, a teacher with attendance cover, and the office roles.** Subject teachers can view but not take it. | Attendance is daily, not per lesson (baseline §6), so one person owns each class's register; cover already has an `attendance` duty for when they are away. |
-| A3 | Does a new register start blank or all Present? | **Blank, with Mark all present.** Save is refused while anyone is unmarked. | Matches the baseline's steps, and a register saved by accident cannot quietly mark absent children present. |
-| A4 | A school day with no register: does it break a run of absences? | **Neither breaks nor extends it**; the missing register is listed for the Headteacher. | A teacher forgetting a register should not hide a child who has missed three days. |
-| A5 | Can Academic Administrators work on absence cases? | **View only.** | The baseline gives follow-up to class teachers and review to the Headteacher. |
-| A6 | Who manages the calendar? | **System and Academic Administrators**; the **Headteacher may add closures**. | Term dates and holidays are set up once a year; closures are on-the-day management decisions. |
-| A7 | How far back may a teacher take or edit a register without it counting as a correction? | **Edit for 2 school days; fill in a missed register up to 5 school days back.** Both adjustable in School setup. | Covers a teacher off sick for a few days without leaving registers open to change indefinitely. |
+| A1 | Statuses: the shared design showed an extra **M**. | **Agreed: no M.** Present, Absent, Late, Excused, as in the baseline. | |
+| A2 | Who may take the register? | **Agreed: the class teacher only.** Office roles correct with a reason; a temporary class-teacher assignment covers absences. | One person owns each class's daily register. |
+| A3 | Does a new register start blank or all Present? | **Agreed: blank**, with Mark all present; Save is refused while anyone is unmarked. | An accidental save cannot mark absent children present. |
+| A4 | A school day with no register: does it break a run of absences? | **Agreed: neither breaks nor extends it**; it is listed on the Headteacher's "registers not taken". | A forgotten register should not hide a child who has missed days. |
+| A5 | Can Academic Administrators work on absence cases? | **Agreed: yes**, on all cases. Reviewing escalations stays with the Headteacher. | |
+| A6 | Who manages the calendar? | **Agreed: System and Academic Administrators; the Headteacher may also add closures**, including grade and class closures (§3.1). | |
+| A7 | How far back may a teacher take or edit a register? | **Agreed: edit for 2 school days; fill in a missed register up to 5 school days back**; both adjustable in School setup. | |
 
 ## 9. Deferred
 
-- Closures for one grade or class only.
 - Attendance percentages and absence lists in reports and exports (slice 6), and on report cards
   (slice 4).
 - Notifying class teachers by email or SMS. Version 1 shows new cases on the dashboard and the
@@ -287,6 +318,5 @@ cases, and escalated cases (Headteacher).
 
 ## 10. Next steps
 
-1. Answer A1 and confirm or change A2–A7.
-2. Build slice 2: migrations, calendar and holiday seed, register screen, absence check, follow-up
+1. Build slice 2: migrations, calendar, holiday seed and grade/class closures, register screen, absence check, follow-up
    screen, profile tabs, dashboard items, tests for every database rule.
