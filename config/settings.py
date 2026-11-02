@@ -1,5 +1,6 @@
 """Settings for school-ms. Everything environment-specific comes from env vars."""
 import os
+import sys
 from pathlib import Path
 
 import dj_database_url
@@ -33,10 +34,12 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django.contrib.postgres",
+    "core",
     "accounts",
     "school",
-    "people",
-    "academics",
+    "staffing",
+    "learners",
 ]
 
 MIDDLEWARE = [
@@ -46,6 +49,8 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "accounts.middleware.UserSessionMiddleware",
+    "core.middleware.AuditContextMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -62,7 +67,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
-                "school.context_processors.school_settings",
+                "core.context_processors.school",
             ],
         },
     },
@@ -86,6 +91,11 @@ DATABASES = {
 }
 
 AUTH_USER_MODEL = "accounts.User"
+AUTHENTICATION_BACKENDS = ["accounts.backends.StaffLoginBackend"]
+
+# The school code that prefixes learner numbers (decision D4), used when the school row is first created.
+SCHOOL_CODE = env("SCHOOL_CODE", "KLT")
+SCHOOL_NAME = env("SCHOOL_NAME", "Kalulushi Trust School")
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
@@ -96,6 +106,8 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LOGIN_URL = "login"
 LOGIN_REDIRECT_URL = "home"
+SESSION_COOKIE_AGE = 60 * 60 * 10  # one school day
+FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024
 LOGOUT_REDIRECT_URL = "login"
 
 LANGUAGE_CODE = "en-gb"
@@ -109,6 +121,9 @@ STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
     "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
 }
+if "test" in sys.argv[1:2]:
+    # Tests don't run collectstatic, so there is no manifest to read.
+    STORAGES["staticfiles"] = {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"}
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

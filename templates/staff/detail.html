@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}{{ person }}{% endblock %}
+{% block content %}
+<h1>{{ person }} {% if not person.is_active %}<span class="tag bad">deactivated</span>{% endif %}</h1>
+<div class="card">
+  <dl class="facts">
+    <dt>Staff number</dt><dd>{{ person.staff_number }}</dd>
+    <dt>Username</dt><dd>{{ person.username }}</dd>
+    <dt>Email</dt><dd>{{ person.email|default:"—" }}</dd>
+    <dt>Mobile</dt><dd>{{ person.phone|default:"—" }}</dd>
+    <dt>Roles</dt><dd>{{ person.role_names|join:", "|default:"—" }}</dd>
+    {% if not person.is_active %}<dt>Deactivated</dt><dd>{{ person.deactivated_at|date:"j M Y H:i" }} by {{ person.deactivated_by }}</dd>{% endif %}
+  </dl>
+  {% if can_manage %}
+  <div class="actions">
+    {% if person.is_active %}
+      <a class="btn secondary small" href="{% url 'staff_edit' person.pk %}">Edit and roles</a>
+      <a class="btn secondary small" href="{% url 'staff_password' person.pk %}">Set new password</a>
+      {% if perms.accounts.deactivate_staff %}<a class="btn danger small" href="{% url 'staff_deactivate' person.pk %}">Deactivate</a>{% endif %}
+    {% elif perms.accounts.deactivate_staff %}
+      <form method="post" action="{% url 'staff_reactivate' person.pk %}">{% csrf_token %}<button class="btn secondary small">Reactivate</button></form>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<h2>Teaching assignments</h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>Class</th><th>Subject</th><th>Type</th><th>From</th><th>To</th><th>Status</th></tr></thead>
+  <tbody>{% for a in assignments %}<tr><td>{{ a.class_subject.class_group }}</td><td>{{ a.class_subject.subject.name }}</td><td>{{ a.assignment_type }}</td><td>{{ a.start_date }}</td><td>{{ a.end_date|default:"—" }}</td><td>{{ a.status }}</td></tr>
+  {% empty %}<tr><td colspan="6" class="muted">None.</td></tr>{% endfor %}
+  {% for c in class_teacher %}<tr><td>{{ c.class_group }}</td><td colspan="2">Class teacher</td><td>{{ c.start_date }}</td><td>{{ c.end_date|default:"—" }}</td><td></td></tr>{% endfor %}</tbody>
+</table></div>
+
+{% if can_manage or user.pk == person.pk %}
+<h2>Signed-in sessions</h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>Since</th><th>Last seen</th><th>From</th><th>Browser</th><th></th></tr></thead>
+  <tbody>{% for s in sessions %}<tr><td>{{ s.created_at|date:"j M H:i" }}</td><td>{{ s.last_seen_at|date:"j M H:i" }}</td><td>{{ s.ip_address|default:"—" }}</td><td class="small">{{ s.user_agent|truncatechars:60 }}</td>
+    <td><form method="post" action="{% url 'session_revoke' person.pk s.pk %}">{% csrf_token %}<button class="link">End</button></form></td></tr>
+  {% empty %}<tr><td colspan="5" class="muted">Not signed in anywhere.</td></tr>{% endfor %}</tbody>
+</table></div>
+{% endif %}
+{% endblock %}

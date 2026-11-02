@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}{{ learner.full_name }}{% endblock %}
+{% block content %}
+<h1>{{ learner.full_name }} <span class="tag{% if learner.status == 'active' %} ok{% endif %}">{{ learner.status }}</span></h1>
+<p class="muted">{{ learner.learner_number }}{% if current %} · {{ current.class_group.name }}, {{ current.academic_year }}{% else %} · not enrolled in a class{% endif %}</p>
+<nav class="tabs">{% for key, label, later in tabs %}<a href="?tab={{ key }}"{% if key == tab %} class="on"{% endif %}>{{ label }}</a>{% endfor %}</nav>
+
+{% if tab == "personal" %}
+<div class="card">
+  <dl class="facts">
+    <dt>First name</dt><dd>{{ learner.first_name }}</dd>
+    <dt>Other names</dt><dd>{{ learner.other_names|default:"—" }}</dd>
+    <dt>Last name</dt><dd>{{ learner.last_name }}</dd>
+    <dt>Date of birth</dt><dd>{{ learner.date_of_birth|default:"—" }}</dd>
+    <dt>Gender</dt><dd>{{ learner.get_gender_display|default:"—" }}</dd>
+    <dt>Registered</dt><dd>{{ learner.registration_date }}</dd>
+    <dt>Previous school</dt><dd>{{ learner.previous_school|default:"—" }}</dd>
+    <dt>Status</dt><dd>{{ learner.status|capfirst }}{% if learner.status_changed_at %} since {{ learner.status_changed_at|date:"j M Y" }}{% endif %}</dd>
+  </dl>
+  {% if perms.learners.change_learner %}<div class="actions"><a class="btn secondary small" href="{% url 'learner_edit' learner.pk %}">Edit details</a> <a class="btn secondary small" href="{% url 'learner_status' learner.pk %}">Change status</a></div>{% endif %}
+</div>
+{% if can_see_notes %}
+<div class="card">
+  <h2 style="margin-top:0">Medical and support notes</h2>
+  {% if notes is None %}
+    <p class="muted">{{ note_count }} note{{ note_count|pluralize }}. Opening them is recorded in the audit log.</p>
+    <div class="actions">{% if note_count %}<a class="btn secondary small" href="?tab=personal&notes=show">Show notes</a>{% endif %}
+    {% if perms.learners.add_learnersupportnote %}<a class="btn secondary small" href="{% url 'learner_note_add' learner.pk %}">Add a note</a>{% endif %}</div>
+  {% else %}
+    {% for n in notes %}<div style="margin-bottom:.75rem"><span class="tag">{{ n.category }}</span> {{ n.note|linebreaksbr }} <div class="muted small">{{ n.created_at|date:"j M Y" }} by {{ n.created_by }}
+      {% if perms.learners.change_learnersupportnote %}<form class="inline" method="post" action="{% url 'learner_note_archive' learner.pk n.pk %}">{% csrf_token %}<button class="link" type="submit">Archive</button></form>{% endif %}</div></div>
+    {% empty %}<p class="muted">No current notes.</p>{% endfor %}
+    {% if perms.learners.add_learnersupportnote %}<a class="btn secondary small" href="{% url 'learner_note_add' learner.pk %}">Add a note</a>{% endif %}
+  {% endif %}
+</div>
+{% elif perms.learners.add_learnersupportnote %}
+<div class="actions"><a class="btn secondary small" href="{% url 'learner_note_add' learner.pk %}">Add a medical or support note</a></div>
+{% endif %}
+
+{% elif tab == "guardians" %}
+{% if perms.learners.add_learnerguardian %}<div class="actions"><a class="btn" href="{% url 'learner_guardian_add' learner.pk %}">Add a guardian</a></div>{% endif %}
+{% for link, contacts in links %}
+<div class="card"{% if link.status == "removed" %} style="opacity:.65"{% endif %}>
+  <h2 style="margin-top:0">{{ link.guardian.full_name }}
+    {% if link.status == "removed" %}<span class="tag bad">removed {{ link.removed_at|date:"j M Y" }}</span>
+    {% elif link.contact_role != "none" %}<span class="tag ok">{{ link.contact_role }} contact</span>{% endif %}
+    {% if link.status == "active" and not link.receives_results %}<span class="tag warn">does not receive results</span>{% endif %}
+  </h2>
+  <dl class="facts">
+    <dt>Relationship</dt><dd>{{ link.relationship|default:"—" }}</dd>
+    <dt>Email</dt><dd>{{ link.guardian.email|default:"—" }}</dd>
+    <dt>Mobile</dt><dd>
+      {% for c in contacts %}
+        <div>{{ c.phone }}
+          {% if c.is_current %}{% if c.is_verified %}<span class="tag ok">verified {{ c.verification_method }}</span>{% else %}<span class="tag warn">not verified</span>
+            {% if link.status == "active" and perms.learners.change_guardiancontact %}<a class="small" href="{% url 'learner_contact_verify' learner.pk c.pk %}">verify</a>{% endif %}{% endif %}
+          {% else %}<span class="tag">old, until {{ c.retired_at|date:"j M Y" }}</span>{% endif %}
+        </div>
+      {% endfor %}
+    </dd>
+    {% if link.status == "removed" %}<dt>Removed because</dt><dd>{{ link.removal_reason }}</dd>{% endif %}
+  </dl>
+  {% if link.status == "active" %}
+  <div class="actions">
+    {% if perms.learners.change_learnerguardian %}
+      <form class="inline" method="post" action="{% url 'learner_link_action' learner.pk link.pk %}">{% csrf_token %}
+        {% if link.contact_role != "primary" %}<button class="btn secondary small" name="action" value="primary">Make primary contact</button>{% endif %}
+        {% if link.contact_role != "alternative" %}<button class="btn secondary small" name="action" value="alternative">Make alternative contact</button>{% endif %}
+        {% if link.contact_role != "none" %}<button class="btn secondary small" name="action" value="none">Clear contact role</button>{% endif %}
+        {% if link.receives_results %}<button class="btn secondary small" name="action" value="results_off">Stop results</button>{% else %}<button class="btn secondary small" name="action" value="results_on">Allow results</button>{% endif %}
+      </form>
+    {% endif %}
+    {% if perms.learners.change_guardiancontact %}<a class="btn secondary small" href="{% url 'learner_phone_change' learner.pk link.guardian.pk %}">Change mobile</a>{% endif %}
+    {% if perms.learners.change_guardian %}<a class="btn secondary small" href="{% url 'learner_guardian_edit' learner.pk link.guardian.pk %}">Edit</a>{% endif %}
+    {% if perms.learners.change_learnerguardian %}<a class="btn danger small" href="{% url 'learner_link_remove' learner.pk link.pk %}">Remove</a>{% endif %}
+  </div>
+  {% endif %}
+</div>
+{% empty %}<p class="muted">No guardians linked.</p>{% endfor %}
+
+{% elif tab == "enrollments" %}
+<div class="actions">
+  {% if current and perms.learners.transfer_learner %}<a class="btn" href="{% url 'learner_transfer' learner.pk %}">Transfer to another class</a>{% endif %}
+  {% if not current and perms.learners.add_enrollment %}<a class="btn" href="{% url 'learner_enroll' learner.pk %}">Enrol in a class</a>{% endif %}
+</div>
+<div class="table-wrap"><table>
+  <thead><tr><th>Year</th><th>Class</th><th>From</th><th>To</th><th>Status</th><th>Reason</th><th>By</th><th></th></tr></thead>
+  <tbody>{% for e in enrollments %}
+    <tr{% if e.status == "reversed" %} style="opacity:.6"{% endif %}>
+      <td>{{ e.academic_year }}</td><td>{{ e.class_group.name }}</td><td>{{ e.start_date }}</td><td>{{ e.end_date|default:"—" }}</td>
+      <td><span class="tag{% if e.status == 'active' %} ok{% elif e.status == 'reversed' %} bad{% endif %}">{{ e.status }}</span>{% if e.end_reason %} <span class="muted small">{{ e.end_reason }}</span>{% endif %}</td>
+      <td class="small">{{ e.reason|linebreaksbr }}</td>
+      <td class="small">{{ e.created_by }}{% if e.approved_by %}<br>approved by {{ e.approved_by }}{% endif %}</td>
+      <td>{% if e.status != "reversed" and perms.learners.change_enrollment %}<a class="small" href="{% url 'learner_enrollment_reverse' learner.pk e.pk %}">reverse</a>{% endif %}</td>
+    </tr>{% empty %}<tr><td colspan="8" class="muted">No enrolments.</td></tr>{% endfor %}</tbody>
+</table></div>
+
+{% else %}
+<div class="notice">This tab arrives with {{ coming_in }}.</div>
+{% endif %}
+{% endblock %}

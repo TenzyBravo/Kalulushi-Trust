@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Learners{% endblock %}
+{% block content %}
+<h1>Learners</h1>
+<form method="get" class="card inline-form">
+  <div><label for="q">Name or learner number</label><input id="q" name="q" value="{{ q }}" placeholder="e.g. Mwansa or KLT-0000013"></div>
+  <div><label for="class">Class</label>
+    <select id="class" name="class"><option value="">All</option>{% for c in classes %}<option value="{{ c.pk }}"{% if c.pk|stringformat:"s" == class_id %} selected{% endif %}>{{ c.name }}</option>{% endfor %}</select></div>
+  <div><label for="status">Status</label>
+    <select id="status" name="status"><option value="">Any</option>{% for s in statuses %}<option value="{{ s }}"{% if s == status %} selected{% endif %}>{{ s|capfirst }}</option>{% endfor %}</select></div>
+  <button class="btn" type="submit">Search</button>
+</form>
+{% if hint %}<div class="notice">{{ hint }}</div>{% endif %}
+<div class="actions">
+  {% if perms.learners.add_learner %}<a class="btn" href="{% url 'learner_register' %}">Register a learner</a>{% endif %}
+  {% if perms.learners.import_learners %}<a class="btn secondary" href="{% url 'learner_import' %}">Import from Excel</a>{% endif %}
+</div>
+<div class="table-wrap"><table>
+  <thead><tr><th>Learner number</th><th>Name</th><th>Class</th><th>Gender</th><th>Status</th></tr></thead>
+  <tbody>
+  {% for learner, enrollment in rows %}
+    <tr>
+      <td><a href="{% url 'learner_profile' learner.pk %}">{{ learner.learner_number }}</a></td>
+      <td><a href="{% url 'learner_profile' learner.pk %}">{{ learner.full_name }}</a></td>
+      <td>{{ enrollment.class_group.name|default:"—" }}</td>
+      <td>{{ learner.gender|default:"—" }}</td>
+      <td><span class="tag{% if learner.status == 'active' %} ok{% endif %}">{{ learner.status }}</span></td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="5" class="muted">No learners found.</td></tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% if rows|length == 300 %}<p class="muted small">Showing the first 300. Narrow the search to see others.</p>{% endif %}
+{% endblock %}

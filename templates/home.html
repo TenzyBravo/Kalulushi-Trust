@@ -1,31 +1,45 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>Welcome, {{ user.get_full_name|default:user.username }}</h1>
-<p class="muted">Signed in as {{ user.get_role_display }}.</p>
+<h1>Welcome, {{ user.get_short_name }}</h1>
+<p class="muted">{{ user.role_names|join:", "|default:"No role assigned yet" }}{% if year %} · Academic year {{ year }}{% endif %}</p>
 
-{% if can_view_pupils %}
+{% if attention %}
 <div class="card">
-  <h2>Pupils</h2>
-  <p>{{ pupil_count }} active pupil{{ pupil_count|pluralize }}.</p>
-  <a href="{% url 'student_list' %}">View pupils</a>
-  {% if can_add_pupils %} · <a href="{% url 'student_add' %}">Add a pupil</a>{% endif %}
+  <h2 style="margin-top:0">Needs attention</h2>
+  {% for count, text, link in attention %}{% if count %}<div><span class="tag warn">{{ count }}</span> {{ text }}</div>{% endif %}{% empty %}{% endfor %}
+  {% if not attention|length %}<p class="muted">Nothing outstanding.</p>{% endif %}
 </div>
 {% endif %}
 
-{% if user.is_admin_role %}
-<div class="card">
-  <h2>School setup</h2>
-  <p>Academic years, terms, levels, grades, classes, subjects, grading scales and staff are managed in the <a href="{% url 'admin:index' %}">admin</a>.</p>
+<div class="grid">
+  {% if learner_count is not None %}
+  <div class="card">
+    <div class="stat">{{ learner_count }}</div>
+    <div class="muted">active learner{{ learner_count|pluralize }}{% if not whole_school %} in your classes{% endif %}</div>
+    <div class="actions">
+      <a class="btn secondary small" href="{% url 'learner_list' %}">View learners</a>
+      {% if perms.learners.add_learner %}<a class="btn small" href="{% url 'learner_register' %}">Register a learner</a>{% endif %}
+    </div>
+  </div>
+  {% endif %}
+  {% if my_subjects is not None %}
+  <div class="card">
+    <h2 style="margin-top:0">My classes</h2>
+    {% if my_class %}<p>Class teacher of <strong>{{ my_class.class_group.name }}</strong></p>{% endif %}
+    {% for a in my_subjects %}<div>{{ a.class_subject.class_group.name }} · {{ a.class_subject.subject.name }}{% if a.assignment_type == "backup" %} <span class="tag">backup</span>{% endif %}</div>
+    {% empty %}{% if not my_class %}<p class="muted">You have no class assignments yet.</p>{% endif %}{% endfor %}
+    {% for c in my_covers %}<div><span class="tag ok">cover</span> {{ c.teacher_assignment.class_subject }} until {{ c.ends_at|date:"j M H:i" }}</div>{% endfor %}
+  </div>
+  {% endif %}
 </div>
-{% elif user.is_head %}
-<div class="card">
-  <h2>School overview</h2>
-  <p>You can view all setup and pupil records in the <a href="{% url 'admin:index' %}">admin</a>.</p>
-</div>
-{% elif user.is_teacher %}
-<div class="card">
-  <h2>My classes</h2>
-  <p class="muted">Class lists, attendance and marks entry will appear here.</p>
-</div>
+
+{% if classes %}
+<h2>Classes in {{ year }}</h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>Class</th><th>Grade</th><th>Learners</th></tr></thead>
+  <tbody>{% for c in classes %}<tr><td><a href="{% url 'learner_list' %}?class={{ c.pk }}">{{ c.name }}</a></td><td>{{ c.grade.name }}</td><td>{{ c.size }}</td></tr>{% endfor %}</tbody>
+</table></div>
+{% elif whole_school and year %}
+<div class="notice">No classes exist for {{ year }} yet. Add them under <a href="{% url 'admin:school_classgroup_changelist' %}">School setup → Classes</a>.</div>
 {% endif %}
 {% endblock %}

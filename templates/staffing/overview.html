@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Assignments{% endblock %}
+{% block content %}
+<h1>Class and subject assignments{% if year %} · {{ year }}{% endif %}</h1>
+{% if not year %}<div class="danger-zone">No academic year is current.</div>{% endif %}
+<form method="get" class="card inline-form">
+  <div><label for="class">Class</label><select id="class" name="class" onchange="this.form.submit()">{% for c in classes %}<option value="{{ c.pk }}"{% if c == selected %} selected{% endif %}>{{ c.name }}</option>{% endfor %}</select></div>
+  <noscript><button class="btn">Show</button></noscript>
+</form>
+{% if selected %}
+<div class="card">
+  <strong>Class teacher:</strong> {{ class_teacher.teacher|default:"none" }}{% if class_teacher %} <span class="muted small">since {{ class_teacher.start_date }}</span>{% endif %}
+  {% if can_change %}<a class="btn secondary small" href="{% url 'class_teacher_set' selected.pk %}">{% if class_teacher %}Change{% else %}Set{% endif %}</a>{% endif %}
+</div>
+<div class="table-wrap"><table>
+  <thead><tr><th>Subject</th><th>Teachers</th><th></th></tr></thead>
+  <tbody>{% for cs, current in subjects %}
+    <tr><td>{{ cs.subject.name }}{% if cs.status != "active" %} <span class="tag">dropped</span>{% endif %}</td>
+      <td>{% for a in current %}<div>{{ a.teacher }} <span class="tag{% if a.assignment_type == 'primary' %} ok{% endif %}">{{ a.assignment_type }}</span> <span class="muted small">from {{ a.start_date }}</span>
+        {% if can_change %}<form class="inline" method="post" action="{% url 'assignment_end' a.pk %}">{% csrf_token %}<button class="link">end</button></form>
+        {% if a.assignment_type == "primary" %} · <a class="small" href="{% url 'cover_add' a.pk %}">give cover</a>{% endif %}{% endif %}</div>
+      {% empty %}<span class="tag warn">no teacher</span>{% endfor %}</td>
+      <td>{% if can_change and cs.status == "active" %}<a class="btn secondary small" href="{% url 'assignment_add' cs.pk %}">Assign</a>{% endif %}</td></tr>
+  {% empty %}<tr><td colspan="3" class="muted">No subjects for this class yet. Add them under <a href="{% url 'admin:school_classsubject_changelist' %}">School setup → Class subjects</a>.</td></tr>{% endfor %}</tbody>
+</table></div>
+{% endif %}
+
+<h2>Current and upcoming cover</h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>Covering</th><th>For</th><th>Class subject</th><th>Window</th><th>Duties</th><th></th></tr></thead>
+  <tbody>{% for c in covers %}<tr><td>{{ c.cover_teacher }}</td><td>{{ c.teacher_assignment.teacher }}</td><td>{{ c.teacher_assignment.class_subject }}</td>
+    <td class="small">{{ c.starts_at|date:"j M H:i" }} – {{ c.ends_at|date:"j M H:i" }}</td><td class="small">{{ c.duties|join:", " }}</td>
+    <td>{% if can_change %}<form method="post" action="{% url 'cover_revoke' c.pk %}">{% csrf_token %}<button class="link">revoke</button></form>{% endif %}</td></tr>
+  {% empty %}<tr><td colspan="6" class="muted">None.</td></tr>{% endfor %}</tbody>
+</table></div>
+{% endblock %}

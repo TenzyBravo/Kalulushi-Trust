@@ -1,86 +1,128 @@
+import datetime
 import io
-import os
-import tempfile
 
-from django.core.management import CommandError, call_command
+from django.core.exceptions import PermissionDenied
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
+from openpyxl import Workbook, load_workbook
 
-from academics.models import Enrollment
-from people.importer import ImportFailed, import_students
-from people.models import Guardian, Student
+from accounts import roles
+from core.models import AuditLog, School
+from learners import importer
+from learners.models import Guardian, Learner
 
-from .factories import make_structure
+from . import factories as f
 
-HEADER = "admission_number,first_name,last_name,gender,date_of_birth,class,guardian_name,guardian_phone,relationship\n"
-GOOD = HEADER + (
-    "2026-001,Chilufya,Mwansa,F,2016-03-14,4A,Mary Mwansa,0971234567,Mother\n"
-    "2026-002,Mwila,Mwansa,M,02/07/2018,2A,Mary Mwansa,+260 97 123 4567,Mother\n"
-    "2026-003,Natasha,Banda,female,,8A,Peter Banda,0961112233,Father\n"
-)
+HEAD = [h for _, h, _ in importer.COLUMNS]
 
 
-def run(text, **kwargs):
-    return import_students(io.StringIO(text), **kwargs)
+def xlsx(rows, headings=HEAD):
+    wb = Workbook()
+    ws = wb.active
+    ws.append(headings)
+    for r in rows:
+        ws.append(r)
+    buf = io.BytesIO()
+    wb.save(buf)
+    return SimpleUploadedFile("learners.xlsx", buf.getvalue())
+
+
+def row(first, last, dob, cls, guardian, phone, gender="F", start="2026-01-20"):
+    return [first, last, "", dob, gender, cls, start, "", guardian, "Mother", phone, ""]
+
+
+GOOD = [
+    row("Chilufya", "Mwansa", "2016-03-14", "4A", "Mary Mwansa", "0971234567"),
+    row("Mwila", "Mwansa", "2018-07-02", "2A", "Mary Mwansa", "+260 97 123 4567", gender="M"),
+    row("Natasha", "Banda", datetime.date(2012, 11, 25), "Form 1A", "Peter Banda", "0961112233"),
+]
 
 
 class ImportTests(TestCase):
     def setUp(self):
-        self.s = make_structure()
+        self.admin = f.admin_user()
+        f.year()
+        for code in ("2", "4", "F1"):
+            f.make_class(code)
+        self.school = School.current()
 
-    def test_imports_pupils_guardians_and_classes(self):
-        result = run(GOOD)
-        self.assertEqual((result.created, result.updated, result.guardians_created), (3, 0, 2))
-        self.assertEqual(Guardian.objects.count(), 2)
-        mary = Guardian.objects.get(phone="+260971234567")
-        self.assertEqual(mary.students.count(), 2)
-        self.assertEqual(Enrollment.objects.get(student__admission_number="2026-003").class_group.name, "8A")
-        self.assertEqual(Student.objects.get(admission_number="2026-001").primary_guardian, mary)
+    def rows(self, data):
+        return importer.read_upload(xlsx(data))
 
-    def test_rerun_updates_not_duplicates(self):
-        run(GOOD)
-        result = run(GOOD.replace("Chilufya", "Chilu").replace("2026-003,Natasha,Banda,female,,8A", "2026-003,Natasha,Banda,F,,4A"))
-        self.assertEqual((result.created, result.updated), (0, 3))
-        self.assertEqual(Student.objects.count(), 3)
-        self.assertEqual(Student.objects.get(admission_number="2026-001").first_name, "Chilu")
-        self.assertEqual(Enrollment.objects.filter(student__admission_number="2026-003").get().class_group.name, "4A")
+    def test_template_has_the_columns_and_classes(self):
+        wb = load_workbook(io.BytesIO(importer.build_template()))
+        self.assertEqual([c.value for c in wb["Learners"][1]], HEAD)
+        self.assertIn("F1A", [r[0].value for r in wb["Instructions"].iter_rows()])
 
-    def test_one_bad_row_saves_nothing(self):
-        bad = GOOD + "2026-004,Bwalya,Zulu,X,,4A,Ann Zulu,123,Aunt\n"
-        with self.assertRaises(ImportFailed) as ctx:
-            run(bad)
-        self.assertEqual(ctx.exception.errors, [
-            "Line 5: gender must be F or M",
-            "Line 5: guardian_phone '123' is not a valid Zambian mobile number",
-        ])
-        self.assertEqual(Student.objects.count(), 0)
-        self.assertEqual(Guardian.objects.count(), 0)
+    def test_preview_finds_problems_without_saving(self):
+        bad = GOOD + [row("Bwalya", "", "14/14/2015", "9Z", "Ann Zulu", "123", gender="X")]
+        preview = importer.validate(self.rows(bad), self.school)
+        self.assertEqual(len(preview.valid), 3)
+        errors = preview.invalid[0].errors
+        self.assertIn("Last name is required", errors)
+        self.assertTrue(any("not a date" in e for e in errors))
+        self.assertTrue(any("Class '9Z'" in e for e in errors))
+        self.assertTrue(any("valid Zambian mobile" in e for e in errors))
+        self.assertIn("Gender must be F or M", errors)
+        self.assertFalse(Learner.objects.exists())
 
-    def test_reports_unknown_class_duplicates_and_missing_columns(self):
-        text = HEADER + (
-            "A1,Ann,Phiri,F,,9Z,Jo Phiri,0971111111,\n"
-            "A1,Ann,Phiri,F,,4A,Jo Phiri,0971111111,\n"
-        )
-        with self.assertRaises(ImportFailed) as ctx:
-            run(text)
-        self.assertIn("Line 2: class '9Z' does not exist for this academic year", ctx.exception.errors)
-        self.assertIn("Line 3: admission_number A1 also appears on line 2", ctx.exception.errors)
-        with self.assertRaises(ImportFailed) as ctx:
-            run("admission_number,first_name\nA1,Ann\n")
-        self.assertIn("Missing column(s)", ctx.exception.errors[0])
+    def test_confirm_creates_valid_rows_and_shares_the_guardian(self):
+        result = importer.confirm(self.rows(GOOD), self.school, self.admin)
+        self.assertEqual(len(result.created), 3)
+        self.assertEqual(Guardian.objects.count(), 2)  # siblings share Mary
+        mary = Guardian.objects.get(full_name="Mary Mwansa")
+        self.assertEqual(mary.learners.count(), 2)
+        self.assertEqual(Learner.objects.get(first_name="Natasha").current_enrollment().class_group.name, "F1A")
+        summary = AuditLog.objects.get(action="learner_import.confirm")
+        self.assertEqual(summary.changes["created"], [None, 3])
 
-    def test_dry_run_saves_nothing(self):
-        result = run(GOOD, dry_run=True)
-        self.assertEqual(result.created, 3)
-        self.assertEqual(Student.objects.count(), 0)
+    def test_reimporting_flags_duplicates_and_skips_them(self):
+        importer.confirm(self.rows(GOOD), self.school, self.admin)
+        preview = importer.validate(self.rows(GOOD), self.school)
+        self.assertEqual(len(preview.flagged), 3)
+        self.assertIn("Links to existing guardian Mary Mwansa", preview.rows[0].guardian_note)
+        result = importer.confirm(self.rows(GOOD), self.school, self.admin)
+        self.assertEqual((len(result.created), len(result.skipped_duplicates)), (0, 3))
+        self.assertEqual(Learner.objects.count(), 3)
 
-    def test_command_reports_errors(self):
-        fd, path = tempfile.mkstemp(suffix=".csv")
-        with os.fdopen(fd, "w") as fh:
-            fh.write(HEADER + "A1,Ann,Phiri,Q,,4A,Jo Phiri,123,\n")
-        err = io.StringIO()
-        try:
-            with self.assertRaisesMessage(CommandError, "2 problem(s) found. Nothing was imported."):
-                call_command("import_students", path, stderr=err, stdout=io.StringIO())
-        finally:
-            os.remove(path)
-        self.assertIn("Line 2: gender must be F or M", err.getvalue())
+    def test_override_imports_flagged_rows_with_reason(self):
+        importer.confirm(self.rows(GOOD[:1]), self.school, self.admin)
+        result = importer.confirm(self.rows(GOOD[:1]), self.school, self.admin, override_reason="Twins")
+        self.assertEqual(len(result.created), 1)
+        self.assertTrue(AuditLog.objects.filter(action="duplicate.override", reason="Twins").exists())
+
+    def test_teachers_cannot_import(self):
+        with self.assertRaises(PermissionDenied):
+            importer.confirm(self.rows(GOOD), self.school, f.make_user("t", roles.TEACHER))
+
+    def test_wrong_file_is_rejected(self):
+        with self.assertRaises(importer.ImportFileError):
+            importer.read_upload(xlsx([["x"]], headings=["Name"]))
+        with self.assertRaises(importer.ImportFileError):
+            importer.read_upload(SimpleUploadedFile("learners.pdf", b"%PDF"))
+
+    def test_error_report_lists_rows_with_problems(self):
+        preview = importer.validate(self.rows([row("A", "", "", "4A", "B", "1")]), self.school)
+        wb = load_workbook(io.BytesIO(importer.error_report(preview.invalid)))
+        last = [c.value for c in wb.active[2]][-1]
+        self.assertIn("Last name is required", last)
+
+
+class ImportCommandTests(TestCase):
+    def test_command_checks_then_imports(self):
+        from io import StringIO
+
+        from django.conf import settings
+        from django.core.management import call_command
+
+        f.admin_user()
+        f.year()
+        for code in ("2", "4", "F1"):
+            f.make_class(code)
+        path = str(settings.BASE_DIR / "samples" / "learners.csv")
+        out = StringIO()
+        call_command("import_learners", path, as_user="sysadmin", stdout=out, stderr=StringIO())
+        self.assertIn("3 valid", out.getvalue())
+        self.assertFalse(Learner.objects.exists())
+        call_command("import_learners", path, as_user="sysadmin", confirm=True, stdout=out, stderr=StringIO())
+        self.assertEqual(Learner.objects.count(), 3)
