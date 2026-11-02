@@ -7,6 +7,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
+from attendance import dashboard as attendance_dashboard
 from learners.models import Enrollment, Guardian, GuardianContact, Learner
 from school.models import AcademicYear
 from staffing import access
@@ -43,7 +44,6 @@ def home(request):
                               .annotate(size=Count("enrollments", filter=Q(enrollments__status="active", enrollments__end_date__isnull=True))))
         else:
             ctx["attention"].insert(0, (1, "academic year to make current", reverse("admin:school_academicyear_changelist")))
-        ctx["attention_total"] = sum(count for count, _, _ in ctx["attention"])
         ctx["glance"] = [
             {"value": ctx.get("learner_count", 0), "label": "Active learners", "tone": "green", "icon": "people",
              "text": "Learners currently at the school", "link": learners_url, "link_text": "View learners"},
@@ -72,6 +72,9 @@ def home(request):
         ctx["my_covers"] = CoverAuthorization.objects.filter(
             cover_teacher=user, revoked_at__isnull=True, ends_at__gt=timezone.now()
         ).select_related("teacher_assignment__class_subject__class_group", "teacher_assignment__class_subject__subject")
+    # Registers and absence cases (slice 2) for everyone who works with attendance.
+    ctx["attention"] = ctx.get("attention", []) + attendance_dashboard.attention_items(user)
+    ctx["attention_total"] = sum(count for count, _, _ in ctx["attention"])
     return render(request, "home.html", ctx)
 
 

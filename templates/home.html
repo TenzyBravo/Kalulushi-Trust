@@ -10,6 +10,7 @@
     </p>
     <div class="pills">
       {% if perms.learners.add_learner %}<a class="pill solid" href="{% url 'learner_register' %}">{% include "icons.html" with name="plus" %} Register a learner</a>{% endif %}
+      {% if perms.attendance.view_attendancesession %}<a class="pill solid" href="{% url 'attendance_today' %}">{% include "icons.html" with name="calendar" %} Registers</a>{% endif %}
       {% if perms.learners.view_learner %}<a class="pill" href="{% url 'learner_list' %}">{% include "icons.html" with name="search" %} Find a learner</a>{% endif %}
       {% if perms.learners.import_learners %}<a class="pill" href="{% url 'learner_import' %}">{% include "icons.html" with name="upload" %} Import from Excel</a>{% endif %}
       {% if user.is_staff %}<a class="pill" href="{% url 'admin:index' %}">{% include "icons.html" with name="gear" %} School setup</a>{% endif %}
@@ -43,7 +44,7 @@
   </div>
 </section>
 
-{% if whole_school %}
+{% if whole_school or attention %}
 <section class="waiting">
   <span class="waiting-label">{% include "icons.html" with name="bolt" %} Waiting on <em>you</em></span>
   {% for count, text, link in attention %}{% if count %}
@@ -51,7 +52,9 @@
   {% endif %}{% endfor %}
   {% if not attention_total %}<span class="muted">Nothing outstanding. All caught up.</span>{% endif %}
 </section>
+{% endif %}
 
+{% if whole_school %}
 <p class="section-eyebrow">The school in numbers</p>
 <h2 class="section-title">{{ school.name|default:"School" }} at a glance</h2>
 <div class="glance">

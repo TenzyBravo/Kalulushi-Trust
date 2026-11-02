@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Absence case · {{ case.learner.full_name }}{% endblock %}
+{% block content %}
+<p class="muted"><a href="{% url 'attendance_followup' %}">Absence follow-up</a></p>
+<h1>{{ case.learner.full_name }} <span class="case-status {{ case.status }}">{{ case.get_status_display }}</span></h1>
+<p class="muted">{{ case.learner.learner_number }} · {{ case.class_group.name }} · class teacher {{ case.assigned_teacher|default:"not assigned" }}
+  · <a href="{% url 'learner_profile' case.learner.pk %}?tab=guardians">guardians and contacts</a></p>
+
+<div class="grid">
+  <div class="card">
+    <h2 style="margin-top:0">Absence</h2>
+    <p><strong>{{ case.days_absent }} consecutive school days</strong>, {{ case.first_absent_date|date:"j M" }} to {{ case.last_absent_date|date:"j M Y" }}</p>
+    {% if case.escalation_reason %}<p class="small"><strong>Referred to the Headteacher</strong> {{ case.escalated_at|date:"j M" }} by {{ case.escalated_by }}: {{ case.escalation_reason }}</p>{% endif %}
+    {% if case.resolution %}<p class="small"><strong>Resolved</strong> {{ case.resolved_at|date:"j M" }} by {{ case.resolved_by }}: {{ case.resolution }}</p>{% endif %}
+    <h3 class="small muted">Recent attendance</h3>
+    <div class="att-days">{% for r in recent %}
+      <span class="att-tag {{ r.status }}{% if r.pk in linked %} linked{% endif %}" title="{{ r.session.date|date:'D j M' }}: {{ r.status }}{% if r.note %} — {{ r.note }}{% endif %}">{{ r.session.date|date:"j M" }} {{ r.status|first|upper }}</span>
+    {% empty %}<span class="muted">No records.</span>{% endfor %}</div>
+  </div>
+  <div class="card">
+    <h2 style="margin-top:0">Guardians</h2>
+    {% for g in guardians %}<div>{{ g.full_name }} {% with c=g.current_contact %}{% if c %}<span class="muted">· {{ c.phone }}</span>{% endif %}{% endwith %}</div>{% empty %}<p class="muted">No guardians linked.</p>{% endfor %}
+  </div>
+</div>
+
+<h2>History</h2>
+<ol class="timeline">
+  {% for a in actions %}
+  <li class="timeline-item kind-{{ a.kind }}">
+    <div class="small muted">{{ a.created_at|date:"j M Y H:i" }} · {% if a.created_by %}{{ a.created_by }}{% else %}system{% endif %} · {{ a.get_kind_display }}</div>
+    {% if a.kind == "contact" %}
+      <div><strong>{{ a.get_contact_method_display }}</strong> on {{ a.contact_date|date:"j M" }}{% if a.contacted_guardian %} with {{ a.contacted_guardian }}{% endif %}</div>
+    {% elif a.status_to %}
+      <div><strong>{{ a.status_from|capfirst }} → {{ a.status_to|capfirst }}</strong></div>
+    {% endif %}
+    {% if a.outcome %}<div>{{ a.outcome|linebreaksbr }}</div>{% endif %}
+    {% if a.reason_category or a.reason_text %}<div class="small">Reason: {{ a.get_reason_category_display }} {{ a.reason_text }}</div>{% endif %}
+    {% if a.next_action %}<div class="small">Next: {{ a.next_action }}{% if a.next_action_due %} by {{ a.next_action_due|date:"j M" }}{% endif %}</div>{% endif %}
+  </li>
+  {% endfor %}
+</ol>
+
+{% if can_work and case.is_open %}
+<h2>Record an action</h2>
+<div class="tabs">
+  <a href="?form=contact" class="{% if open_form == 'contact' or not open_form %}on{% endif %}">Contact</a>
+  <a href="?form=note" class="{% if open_form == 'note' %}on{% endif %}">Note</a>
+  <a href="?form=status" class="{% if open_form == 'status' %}on{% endif %}">Change status / refer</a>
+</div>
+{% if open_form == "note" %}
+  <form method="post" class="card">{% csrf_token %}<input type="hidden" name="action" value="note">
+    {% with form=note_form %}{% include "includes/fields.html" %}{% endwith %}
+    <div class="actions"><button class="btn" type="submit">Add note</button></div></form>
+{% elif open_form == "status" %}
+  <form method="post" class="card">{% csrf_token %}<input type="hidden" name="action" value="status">
+    {% if case.status == "escalated" and not can_review %}<div class="notice">This case is with the Headteacher. Only they can move it on; you can still record contacts and notes.</div>{% endif %}
+    {% with form=status_form %}{% include "includes/fields.html" %}{% endwith %}
+    <div class="actions"><button class="btn" type="submit">Save</button></div></form>
+{% else %}
+  <form method="post" class="card">{% csrf_token %}<input type="hidden" name="action" value="contact">
+    {% with form=contact_form %}{% include "includes/fields.html" %}{% endwith %}
+    <div class="actions"><button class="btn" type="submit">Record contact</button></div></form>
+{% endif %}
+{% elif not case.is_open %}
+<p class="muted">This case is resolved. If the learner is absent two school days in a row again, a new case opens.</p>
+{% endif %}
+{% endblock %}

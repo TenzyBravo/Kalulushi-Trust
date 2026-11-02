@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Registers · {{ day|date:"j M Y" }}{% endblock %}
+{% block content %}
+<div class="section-head">
+  <div>
+    <p class="section-eyebrow">Daily attendance</p>
+    <h1 class="section-title">Registers for {{ day|date:"l, j F Y" }}</h1>
+  </div>
+  <form method="get" class="inline-form">
+    <a class="btn small secondary" href="?date={{ prev_day|date:'Y-m-d' }}">‹</a>
+    <input type="date" name="date" value="{{ day|date:'Y-m-d' }}" onchange="this.form.submit()" aria-label="Date">
+    {% if day < today %}<a class="btn small secondary" href="?date={{ next_day|date:'Y-m-d' }}">›</a>{% endif %}
+    {% if day != today %}<a class="btn small" href="?">Today</a>{% endif %}
+  </form>
+</div>
+
+{% if not school_day %}<div class="notice">{{ non_school_reason|default:"Not a school day." }} No registers are expected.</div>{% endif %}
+
+{% if mine %}
+<h2>My class</h2>
+<div class="explore">
+  {% for r in mine %}
+  <a class="explore-card" href="{{ r.url }}">
+    <span class="explore-icon">{% include "icons.html" with name="calendar" %}</span>
+    <span class="explore-body">
+      <span class="explore-value">{{ r.class_group.name }}</span>
+      <span class="explore-name">{% if r.state == "taken" %}Taken · {{ r.session.absent }} absent of {{ r.session.total }}{% elif r.state == "closed" %}{{ r.reason }}{% else %}Not taken yet: tap to take it{% endif %}</span>
+    </span>
+    <span class="reg-state {{ r.state }}">{% if r.state == "taken" %}Taken{% elif r.state == "closed" %}Closed{% else %}To do{% endif %}</span>
+  </a>
+  {% endfor %}
+</div>
+{% elif not overview %}
+<p class="muted">You are not class teacher of any class on this date, so you have no register to take. Registers for classes you teach are shown on each learner's Attendance tab.</p>
+{% endif %}
+
+{% if overview %}
+<h2>All classes {% if school_day %}<span class="muted small">· {{ not_taken }} not taken</span>{% endif %}</h2>
+<div class="table-wrap card flush"><table>
+  <thead><tr><th>Class</th><th>Class teacher</th><th>Register</th><th>Absent</th><th></th></tr></thead>
+  <tbody>{% for r in overview %}
+    <tr>
+      <td>{{ r.class_group.name }}</td>
+      <td>{{ r.teacher|default:"—" }}</td>
+      <td><span class="reg-state {{ r.state }}">{% if r.state == "taken" %}Taken by {{ r.session.taken_by }}{% elif r.state == "closed" %}Closed{% else %}Not taken{% endif %}</span>
+        {% if r.state == "closed" and school_day %}<div class="muted small">{{ r.reason }}</div>{% endif %}</td>
+      <td>{% if r.session %}{{ r.session.absent }} / {{ r.session.total }}{% endif %}</td>
+      <td><a href="{{ r.url }}">Open</a></td>
+    </tr>{% empty %}<tr><td colspan="5" class="muted">No active classes this year.</td></tr>{% endfor %}</tbody>
+</table></div>
+{% endif %}
+{% endblock %}

@@ -95,6 +95,43 @@
     </tr>{% empty %}<tr><td colspan="8" class="muted">No enrolments.</td></tr>{% endfor %}</tbody>
 </table></div>
 
+{% elif tab == "attendance" %}
+<form method="get" class="inline-form" style="margin-bottom:1rem">
+  <input type="hidden" name="tab" value="attendance">
+  <label for="term">Term</label>
+  <select id="term" name="term" onchange="this.form.submit()">
+    {% for t in terms %}<option value="{{ t.pk }}"{% if t == term %} selected{% endif %}>{{ t }}</option>{% endfor %}
+  </select>
+</form>
+<div class="att-summary">
+  <div class="att-chip present"><strong>{{ counts.present }}</strong> present</div>
+  <div class="att-chip late"><strong>{{ counts.late }}</strong> late</div>
+  <div class="att-chip absent"><strong>{{ counts.absent }}</strong> absent</div>
+  <div class="att-chip excused"><strong>{{ counts.excused }}</strong> excused</div>
+  {% if attendance_rate is not None %}<div class="att-chip"><strong>{{ attendance_rate }}%</strong> attended (present or late)</div>{% endif %}
+</div>
+<div class="table-wrap"><table>
+  <thead><tr><th>Date</th><th>Class</th><th>Status</th><th>Note</th></tr></thead>
+  <tbody>{% for r in records %}
+    <tr><td>{{ r.session.date|date:"D j M Y" }}</td><td>{{ r.class_group.name }}</td>
+      <td><span class="att-tag {{ r.status }}">{{ r.status|capfirst }}</span></td><td class="small">{{ r.note }}</td></tr>
+  {% empty %}<tr><td colspan="4" class="muted">No attendance recorded{% if term %} in {{ term }}{% endif %}.</td></tr>{% endfor %}</tbody>
+</table></div>
+
+{% elif tab == "followup" %}
+{% for case in cases %}
+<div class="card">
+  <div style="display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap">
+    <div><strong>Absent {{ case.days_absent }} school days</strong>, {{ case.first_absent_date|date:"j M" }} to {{ case.last_absent_date|date:"j M Y" }} · {{ case.class_group.name }}
+      <div class="muted small">Class teacher: {{ case.assigned_teacher|default:"none assigned" }} · {{ case.actions.all|length }} action{{ case.actions.all|length|pluralize }}</div></div>
+    <div><span class="case-status {{ case.status }}">{{ case.get_status_display }}</span>
+      {% if can_open_cases %} <a class="btn small secondary" href="{% url 'attendance_case' case.pk %}">Open case</a>{% endif %}</div>
+  </div>
+</div>
+{% empty %}
+<p class="muted">No absence cases. A case opens automatically after two consecutive school days absent.</p>
+{% endfor %}
+
 {% else %}
 <div class="notice">This tab arrives with {{ coming_in }}.</div>
 {% endif %}

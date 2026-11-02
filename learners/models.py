@@ -235,6 +235,8 @@ class Enrollment(models.Model):
                 ],
                 condition=~Q(status="reversed"),
             ),
+            # Target of the composite foreign key from attendance_records (slice 2).
+            models.UniqueConstraint(fields=["id", "class_group", "learner"], name="enrollments_id_class_learner_unique"),
         ]
         indexes = [models.Index(fields=["class_group"], condition=Q(status="active"), name="enrollments_active_class")]
 

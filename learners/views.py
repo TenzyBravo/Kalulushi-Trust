@@ -24,11 +24,11 @@ TABS = [
     ("personal", "Personal details", None),
     ("guardians", "Guardians and contacts", None),
     ("enrollments", "Enrolment and class history", None),
-    ("attendance", "Attendance", "module 2"),
+    ("attendance", "Attendance", None),
     ("results", "Academic results", "module 3"),
     ("competencies", "Competency development", "module 3"),
     ("reports", "Report cards", "module 4"),
-    ("followup", "Absence follow-up", "module 2"),
+    ("followup", "Absence follow-up", None),
 ]
 IMPORT_SESSION_KEY = "learner_import_rows"
 
@@ -42,6 +42,31 @@ def _visible_learner(request, pk):
     if not access.can_view_learner(request.user, learner):
         raise Http404  # don't reveal learners outside the user's classes
     return learner
+
+
+def attendance_summary(learner, term_id=None):
+    """The learner's records for one term (default: the term of today, else the latest), with counts."""
+    from django.utils import timezone
+
+    from attendance.models import STATUSES
+    from school.models import Term
+
+    terms = list(Term.objects.filter(academic_year__school=learner.school).select_related("academic_year")
+                 .order_by("-start_date"))
+    today = timezone.localdate()
+    term = next((t for t in terms if str(t.pk) == str(term_id)), None) \
+        or next((t for t in terms if t.start_date <= today <= t.end_date), None) \
+        or next((t for t in terms if t.start_date <= today), None)
+    records = learner.attendance_records.select_related("session", "class_group").order_by("-session__date")
+    if term:
+        records = records.filter(session__date__range=(term.start_date, term.end_date))
+    records = list(records)
+    counts = {s: sum(1 for r in records if r.status == s) for s in STATUSES}
+    attended = counts["present"] + counts["late"]
+    return {
+        "terms": terms, "term": term, "records": records, "counts": counts,
+        "attendance_rate": round(100 * attended / len(records)) if records else None,
+    }
 
 
 def _profile_url(learner, tab="personal"):
@@ -140,6 +165,11 @@ def profile(request, pk):
         ctx["links"] = [(l, l.guardian.contacts.all()) for l in links]
     elif tab == "enrollments":
         ctx["enrollments"] = learner.enrollments.select_related("class_group", "academic_year", "created_by", "approved_by")
+    elif tab == "attendance":
+        ctx.update(attendance_summary(learner, request.GET.get("term")))
+    elif tab == "followup":
+        ctx["cases"] = learner.absence_cases.select_related("class_group", "assigned_teacher").prefetch_related("actions")
+        ctx["can_open_cases"] = user.has_perm("attendance.view_absencecase")
     else:
         ctx["coming_in"] = dict((t, m) for t, _, m in TABS)[tab]
     return render(request, "learners/profile.html", ctx)

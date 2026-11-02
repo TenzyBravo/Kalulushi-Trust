@@ -30,6 +30,14 @@ LEARNER_RECORDS = [
 ]
 
 
+# Slice 2: registers, absence cases and the calendar (attendance design §6).
+ATTENDANCE_OFFICE = [
+    "attendance.view_attendancesession", "attendance.correct_attendance", "attendance.add_closure",
+    "attendance.view_absencecase", "attendance.change_absencecase", "attendance.view_calendarevent",
+]
+CALENDAR_MANAGEMENT = ["attendance.add_calendarevent", "attendance.change_calendarevent"]
+
+
 def _model_perms(models, actions):
     return [f"{m.split('.')[0]}.{a}_{m.split('.')[1]}" for m in models for a in actions]
 
@@ -43,6 +51,7 @@ ROLE_PERMISSIONS = {
         + ["accounts.view_user", "accounts.manage_staff", "accounts.deactivate_staff",
            "learners.override_duplicate", "learners.view_support_notes", "learners.transfer_learner",
            "learners.import_learners", "core.view_audit_log"]
+        + ATTENDANCE_OFFICE + CALENDAR_MANAGEMENT + ["attendance.review_escalations"]
     ),
     HEADTEACHER: (
         _model_perms(STRUCTURE, ["view"])
@@ -51,6 +60,7 @@ ROLE_PERMISSIONS = {
         + ["accounts.view_user", "accounts.manage_staff", "accounts.deactivate_staff",
            "learners.override_duplicate", "learners.view_support_notes", "learners.transfer_learner",
            "learners.import_learners", "core.view_audit_log"]
+        + ATTENDANCE_OFFICE + ["attendance.review_escalations"]
     ),
     ACADEMIC_ADMIN: (
         _model_perms(STRUCTURE, ["add", "change", "view"])
@@ -58,11 +68,15 @@ ROLE_PERMISSIONS = {
         + _model_perms([m for m in LEARNER_RECORDS if m != "learners.learnersupportnote"], ["add", "change", "view"])
         + ["learners.add_learnersupportnote", "accounts.view_user",
            "learners.override_duplicate", "learners.import_learners"]
+        + ATTENDANCE_OFFICE + CALENDAR_MANAGEMENT
     ),
     # Teachers see learners only in their assigned classes (staffing.access).
     # Support notes need view_support_notes granted to the individual teacher.
+    # Only a class teacher takes a register (decision A2); attendance.access checks that.
     TEACHER: ["learners.view_learner", "learners.view_guardian", "learners.view_enrollment",
-              "school.view_classgroup", "school.view_subject"],
+              "school.view_classgroup", "school.view_subject",
+              "attendance.take_register", "attendance.view_attendancesession",
+              "attendance.view_absencecase", "attendance.change_absencecase", "attendance.view_calendarevent"],
 }
 
 

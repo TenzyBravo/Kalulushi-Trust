@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Absence follow-up{% endblock %}
+{% block content %}
+<p class="section-eyebrow">Early warning</p>
+<h1 class="section-title">Absence follow-up</h1>
+<p class="section-intro">A case opens when a learner is absent two school days in a row. Escalated and long-outstanding cases (no action for {{ stale_days }} school days) are shown first.</p>
+
+<form method="get" class="inline-form card">
+  <div><label for="status">Status</label>
+    <select id="status" name="status">
+      <option value="open"{% if status == "open" %} selected{% endif %}>All open</option>
+      {% for value, label in statuses %}<option value="{{ value }}"{% if status == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
+      <option value="all"{% if status == "all" %} selected{% endif %}>All, including resolved</option>
+    </select></div>
+  <div><label for="class">Class</label>
+    <select id="class" name="class"><option value="">All</option>
+      {% for c in classes %}<option value="{{ c.pk }}"{% if class_id == c.pk|stringformat:"s" %} selected{% endif %}>{{ c.name }} ({{ c.academic_year }})</option>{% endfor %}
+    </select></div>
+  {% if teachers|length > 1 %}<div><label for="teacher">Teacher</label>
+    <select id="teacher" name="teacher"><option value="">All</option>
+      {% for t in teachers %}<option value="{{ t.pk }}"{% if teacher_id == t.pk|stringformat:"s" %} selected{% endif %}>{{ t }}</option>{% endfor %}
+    </select></div>{% endif %}
+  <div><label for="from">Flagged since</label><input type="date" id="from" name="from" value="{{ from }}"></div>
+  <button class="btn" type="submit">Filter</button>
+</form>
+
+<div class="table-wrap card flush"><table>
+  <thead><tr><th>Learner</th><th>Class</th><th>Absent</th><th>Status</th><th>Class teacher</th><th>Last action</th></tr></thead>
+  <tbody>{% for c in cases %}
+    <tr{% if c.status == "escalated" or c.stale %} class="row-flag"{% endif %}>
+      <td><a href="{% url 'attendance_case' c.pk %}">{{ c.learner.full_name }}</a><div class="muted small">{{ c.learner.learner_number }}</div></td>
+      <td>{{ c.class_group.name }}</td>
+      <td>{{ c.days_absent }} days<div class="muted small">{{ c.first_absent_date|date:"j M" }} – {{ c.last_absent_date|date:"j M" }}</div></td>
+      <td><span class="case-status {{ c.status }}">{{ c.get_status_display }}</span>{% if c.stale %} <span class="tag warn">no action for {{ stale_days }}+ days</span>{% endif %}</td>
+      <td>{{ c.assigned_teacher|default:"—" }}</td>
+      <td class="small">{{ c.last_action|date:"j M H:i"|default:"—" }}</td>
+    </tr>{% empty %}<tr><td colspan="6" class="muted">No cases match.</td></tr>{% endfor %}</tbody>
+</table></div>
+{% endblock %}
