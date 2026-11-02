@@ -81,12 +81,26 @@
 {% endif %}
 
 {% if classes %}
-<p class="section-eyebrow">Academic year {{ year }}</p>
-<h2 class="section-title">Classes</h2>
-<div class="table-wrap card flush"><table>
-  <thead><tr><th>Class</th><th>Grade</th><th>Learners</th></tr></thead>
-  <tbody>{% for c in classes %}<tr><td><a href="{% url 'learner_list' %}?class={{ c.pk }}">{{ c.name }}</a></td><td>{{ c.grade.name }}</td><td>{{ c.size }}</td></tr>{% endfor %}</tbody>
-</table></div>
+<div class="section-head">
+  <div>
+    <p class="section-eyebrow">Drill down</p>
+    <h2 class="section-title">Explore by class ({{ year }})</h2>
+  </div>
+  <a class="section-link" href="{% url 'learner_list' %}">All learners <span aria-hidden="true">→</span></a>
+</div>
+<p class="section-intro">Active learners in each class. Choose a class to see its learners.</p>
+<div class="explore">
+  {% for c in classes %}
+  <a class="explore-card" href="{% url 'learner_list' %}?class={{ c.pk }}">
+    <span class="explore-icon">{% include "icons.html" with name="building" %}</span>
+    <span class="explore-body">
+      <span class="explore-value">{{ c.size }}</span>
+      <span class="explore-name">Class {{ c.name }} · {{ c.grade.name }}</span>
+    </span>
+    <span class="explore-chevron" aria-hidden="true">›</span>
+  </a>
+  {% endfor %}
+</div>
 {% elif whole_school and year %}
 <div class="notice">No classes exist for {{ year }} yet. Add them under <a href="{% url 'admin:school_classgroup_changelist' %}">School setup → Classes</a>.</div>
 {% endif %}

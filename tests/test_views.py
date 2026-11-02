@@ -50,6 +50,9 @@ class ScreenTests(TestCase):
         self.assertEqual(glance["Numbers to verify"], 2)
         self.assertEqual(glance["Classes"], 2)
         self.assertEqual(glance["Staff"], 3)
+        self.assertContains(response, "Explore by class (2026)")
+        self.assertContains(response, f'href="/learners/?class={self.c3a.pk}"')
+        self.assertEqual({c.name: c.size for c in response.context["classes"]}, {"3A": 1, "3B": 1})
 
     def test_dashboard_for_teachers_shows_their_own_classes(self):
         self.login(self.teacher)
