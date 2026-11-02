@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Add a guardian{% endblock %}
+{% block content %}
+<p class="muted"><a href="{% url 'learner_detail' learner.pk %}?tab=guardians">{{ learner.full_name }}</a> · {{ learner.learner_number }}</p>
+<h1>Add a guardian</h1>
+<div class="card">
+  <form method="post">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+    {% include "learners/_field.html" with field=form.full_name %}
+    {% include "learners/_field.html" with field=form.phone %}
+    {% include "learners/_field.html" with field=form.email %}
+    {% include "learners/_field.html" with field=form.relationship %}
+    {% include "learners/_field.html" with field=form.contact_role %}
+    {% include "learners/_field.html" with field=form.receives_results %}
+    {% if matches %}
+      {% include "learners/_guardian_matches.html" with matches=matches name="guardian_choice" %}
+    {% else %}
+      <input type="hidden" name="guardian_choice" value="{{ form.guardian_choice.value|default:'' }}">
+    {% endif %}
+    <div class="actions"><button class="btn" type="submit">Add guardian</button> <a href="{% url 'learner_detail' learner.pk %}?tab=guardians">Cancel</a></div>
+  </form>
+</div>
+{% endblock %}

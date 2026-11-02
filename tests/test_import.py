@@ -1,86 +1,90 @@
 import io
-import os
-import tempfile
+from pathlib import Path
 
-from django.core.management import CommandError, call_command
+from django.core.management import call_command
 from django.test import TestCase
 
-from academics.models import Enrollment
-from people.importer import ImportFailed, import_students
-from people.models import Guardian, Student
+from core.context import acting_as
+from learners.importer import ImportFailed, import_learners
+from learners.models import Guardian, Learner
 
-from .factories import make_structure
+from . import factories as f
 
-HEADER = "admission_number,first_name,last_name,gender,date_of_birth,class,guardian_name,guardian_phone,relationship\n"
-GOOD = HEADER + (
-    "2026-001,Chilufya,Mwansa,F,2016-03-14,4A,Mary Mwansa,0971234567,Mother\n"
-    "2026-002,Mwila,Mwansa,M,02/07/2018,2A,Mary Mwansa,+260 97 123 4567,Mother\n"
-    "2026-003,Natasha,Banda,female,,8A,Peter Banda,0961112233,Father\n"
-)
+HEADER = "first_name,last_name,gender,date_of_birth,class,guardian_name,guardian_phone,relationship\n"
 
 
-def run(text, **kwargs):
-    return import_students(io.StringIO(text), **kwargs)
-
-
-class ImportTests(TestCase):
+class Import(TestCase):
     def setUp(self):
-        self.s = make_structure()
+        self.actor = f.academic_admin()
+        for code, stream in (("4", "A"), ("2", "A")):
+            f.school_class(code, stream)
 
-    def test_imports_pupils_guardians_and_classes(self):
-        result = run(GOOD)
-        self.assertEqual((result.created, result.updated, result.guardians_created), (3, 0, 2))
-        self.assertEqual(Guardian.objects.count(), 2)
-        mary = Guardian.objects.get(phone="+260971234567")
-        self.assertEqual(mary.students.count(), 2)
-        self.assertEqual(Enrollment.objects.get(student__admission_number="2026-003").class_group.name, "8A")
-        self.assertEqual(Student.objects.get(admission_number="2026-001").primary_guardian, mary)
+    def run_import(self, rows, **kwargs):
+        with acting_as(self.actor):
+            return import_learners(self.actor, io.StringIO(HEADER + rows), **kwargs)
 
-    def test_rerun_updates_not_duplicates(self):
-        run(GOOD)
-        result = run(GOOD.replace("Chilufya", "Chilu").replace("2026-003,Natasha,Banda,female,,8A", "2026-003,Natasha,Banda,F,,4A"))
-        self.assertEqual((result.created, result.updated), (0, 3))
-        self.assertEqual(Student.objects.count(), 3)
-        self.assertEqual(Student.objects.get(admission_number="2026-001").first_name, "Chilu")
-        self.assertEqual(Enrollment.objects.filter(student__admission_number="2026-003").get().class_group.name, "4A")
+    def test_valid_file_registers_everyone(self):
+        result = self.run_import(
+            "Chilufya,Mwansa,F,2016-03-14,4A,Mary Mwansa,0971234567,Mother\n"
+            "Mwila,Mwansa,M,02/07/2018,2a,Mary Mwansa,+260 97 123 4567,Mother\n"
+        )
+        self.assertEqual(len(result.learners), 2)
+        self.assertEqual(Guardian.objects.count(), 1)  # same name and number: one guardian
+        self.assertEqual(result.guardians_reused, 1)
 
     def test_one_bad_row_saves_nothing(self):
-        bad = GOOD + "2026-004,Bwalya,Zulu,X,,4A,Ann Zulu,123,Aunt\n"
-        with self.assertRaises(ImportFailed) as ctx:
-            run(bad)
-        self.assertEqual(ctx.exception.errors, [
-            "Line 5: gender must be F or M",
-            "Line 5: guardian_phone '123' is not a valid Zambian mobile number",
-        ])
-        self.assertEqual(Student.objects.count(), 0)
-        self.assertEqual(Guardian.objects.count(), 0)
+        with self.assertRaises(ImportFailed) as caught:
+            self.run_import(
+                "Chilufya,Mwansa,F,2016-03-14,4A,Mary Mwansa,0971234567,Mother\n"
+                "Mwila,Mwansa,X,2018-07-02,9Z,Mary Mwansa,12345,Mother\n"
+            )
+        errors = " ".join(caught.exception.errors)
+        self.assertIn("Line 3: gender", errors)
+        self.assertIn("class '9Z'", errors)
+        self.assertIn("not a valid Zambian mobile", errors)
+        self.assertEqual(Learner.objects.count(), 0)
 
-    def test_reports_unknown_class_duplicates_and_missing_columns(self):
-        text = HEADER + (
-            "A1,Ann,Phiri,F,,9Z,Jo Phiri,0971111111,\n"
-            "A1,Ann,Phiri,F,,4A,Jo Phiri,0971111111,\n"
+    def test_duplicate_within_file_saves_nothing(self):
+        row = "Chilufya,Mwansa,F,2016-03-14,4A,Mary Mwansa,0971234567,Mother\n"
+        with self.assertRaises(ImportFailed) as caught:
+            self.run_import(row + row)
+        self.assertIn("Line 3: looks like Chilufya Mwansa", caught.exception.errors[0])
+        self.assertEqual(Learner.objects.count(), 0)
+
+    def test_duplicates_can_be_overridden_with_reason(self):
+        row = "Chilufya,Mwansa,F,2016-03-14,4A,Mary Mwansa,0971234567,Mother\n"
+        result = self.run_import(row + row, override_reason="Confirmed twins")
+        self.assertEqual(len(result.learners), 2)
+
+    def test_shared_handset_different_name_makes_new_guardian(self):
+        result = self.run_import(
+            "Chilufya,Mwansa,F,2016-03-14,4A,Mary Mwansa,0971234567,Mother\n"
+            "Joseph,Phiri,M,2018-01-01,2A,Grace Phiri,0971234567,Mother\n"
         )
-        with self.assertRaises(ImportFailed) as ctx:
-            run(text)
-        self.assertIn("Line 2: class '9Z' does not exist for this academic year", ctx.exception.errors)
-        self.assertIn("Line 3: admission_number A1 also appears on line 2", ctx.exception.errors)
-        with self.assertRaises(ImportFailed) as ctx:
-            run("admission_number,first_name\nA1,Ann\n")
-        self.assertIn("Missing column(s)", ctx.exception.errors[0])
+        self.assertEqual(Guardian.objects.count(), 2)
+        self.assertIn("also belongs to Mary Mwansa", result.warnings[0])
 
     def test_dry_run_saves_nothing(self):
-        result = run(GOOD, dry_run=True)
-        self.assertEqual(result.created, 3)
-        self.assertEqual(Student.objects.count(), 0)
+        result = self.run_import("Chilufya,Mwansa,F,2016-03-14,4A,Mary Mwansa,0971234567,Mother\n", dry_run=True)
+        self.assertEqual(len(result.learners), 1)
+        self.assertEqual(Learner.objects.count(), 0)
 
-    def test_command_reports_errors(self):
-        fd, path = tempfile.mkstemp(suffix=".csv")
-        with os.fdopen(fd, "w") as fh:
-            fh.write(HEADER + "A1,Ann,Phiri,Q,,4A,Jo Phiri,123,\n")
-        err = io.StringIO()
-        try:
-            with self.assertRaisesMessage(CommandError, "2 problem(s) found. Nothing was imported."):
-                call_command("import_students", path, stderr=err, stdout=io.StringIO())
-        finally:
-            os.remove(path)
-        self.assertIn("Line 2: gender must be F or M", err.getvalue())
+    def test_sample_file_and_command(self):
+        f.school_class("F1", "A")
+        sample = Path(__file__).resolve().parent.parent / "samples" / "learners.csv"
+        out = io.StringIO()
+        call_command("import_learners", str(sample), "--as", self.actor.username, stdout=out)
+        self.assertIn("Registered 3 learner(s)", out.getvalue())
+
+
+class SetupSchool(TestCase):
+    def test_creates_structure_and_is_rerunnable(self):
+        out = io.StringIO()
+        call_command("setup_school", "--year", "2030", stdout=out)
+        call_command("setup_school", "--year", "2030", stdout=out)
+        school = f.school()
+        self.assertEqual(school.grades.count(), 11)
+        self.assertEqual(list(school.grades.values_list("code", flat=True)), [*"1234567", "F1", "F2", "F3", "F4"])
+        year = school.academic_years.get(name="2030")
+        self.assertEqual(year.status, "current")
+        self.assertEqual(year.terms.count(), 3)

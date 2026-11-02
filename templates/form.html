@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+{% if learner %}<p class="muted"><a href="{% url 'learner_detail' learner.pk %}">{{ learner.full_name }}</a> · {{ learner.learner_number }}</p>{% endif %}
+<h1>{{ title }}</h1>
+{% if intro %}<p>{{ intro }}</p>{% endif %}
+<div class="card">
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    {{ form.as_div }}
+    <div class="actions">
+      <button class="btn{% if danger %} danger{% endif %}" type="submit">{{ submit|default:"Save" }}</button>
+      <a href="{% if learner %}{% url 'learner_detail' learner.pk %}{% else %}javascript:history.back(){% endif %}">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

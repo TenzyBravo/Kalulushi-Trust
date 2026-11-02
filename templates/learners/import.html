@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Import learners{% endblock %}
+{% block content %}
+<h1>Import learners from CSV</h1>
+<p>Every row is checked first. If any row has a problem, nothing is saved and each problem is listed by line.
+Learners go into classes of the current academic year.</p>
+<details class="card"><summary>File format</summary>
+  <p>Required columns: <code>first_name, last_name, gender, class, guardian_name, guardian_phone</code>.</p>
+  <p>Optional: <code>other_names, date_of_birth, registration_date</code> (YYYY-MM-DD or DD/MM/YYYY),
+  <code>previous_school, guardian_email, relationship</code>.</p>
+  <p><code>class</code> is the class name, e.g. <code>4A</code> or <code>F1B</code>. The guardian becomes the primary contact.
+  A guardian already saved with the same name and number is linked rather than created again.</p>
+</details>
+
+{% if errors %}
+<div class="warning"><strong>Nothing was imported.</strong> Fix these and try again:
+  <ul>{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul></div>
+{% endif %}
+
+{% if result %}
+<div class="card">
+  <p><strong>{% if dry_run %}The file is valid. Importing would register{% else %}Registered{% endif %} {{ result.learners|length }} learner(s).</strong>
+  {% if result.guardians_reused %}{{ result.guardians_reused }} existing guardian(s) linked.{% endif %}</p>
+  {% if result.warnings %}<ul class="muted">{% for w in result.warnings %}<li>{{ w }}</li>{% endfor %}</ul>{% endif %}
+  {% if not dry_run %}<ul>{% for l in result.learners %}<li><a href="{% url 'learner_detail' l.pk %}">{{ l.learner_number }} {{ l.full_name }}</a></li>{% endfor %}</ul>{% endif %}
+</div>
+{% endif %}
+
+<div class="card">
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    {% include "learners/_field.html" with field=form.file %}
+    {% include "learners/_field.html" with field=form.dry_run %}
+    {% if perms.learners.override_duplicate %}{% include "learners/_field.html" with field=form.override_reason %}{% endif %}
+    <div class="actions"><button class="btn" type="submit">Upload</button></div>
+  </form>
+</div>
+{% endblock %}

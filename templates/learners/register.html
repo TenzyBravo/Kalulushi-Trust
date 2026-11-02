@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Register a learner{% endblock %}
+{% block content %}
+<h1>Register a learner</h1>
+
+{% if duplicates %}
+<div class="warning">
+  <strong>This learner may already be registered.</strong>
+  <ul>{% for match, why in duplicates %}
+    <li><a href="{% url 'learner_detail' match.pk %}" target="_blank">{{ match.full_name }} ({{ match.learner_number }})</a>, born {{ match.date_of_birth|date:"d M Y"|default:"unknown" }}, {{ match.get_status_display|lower }} – {{ why }}</li>
+  {% endfor %}</ul>
+  {% if can_override %}
+    <p>If you have checked and this is a different child, give the reason below and save again. The reason is recorded in the audit log.</p>
+  {% else %}
+    <p>Please check with the Headteacher or an administrator before registering this learner.</p>
+  {% endif %}
+</div>
+{% endif %}
+
+<form method="post">
+  {% csrf_token %}
+  {{ form.non_field_errors }}
+  <div class="card">
+    <h2>Learner</h2>
+    {% include "learners/_field.html" with field=form.first_name %}
+    {% include "learners/_field.html" with field=form.other_names %}
+    {% include "learners/_field.html" with field=form.last_name %}
+    {% include "learners/_field.html" with field=form.gender %}
+    {% include "learners/_field.html" with field=form.date_of_birth %}
+    {% include "learners/_field.html" with field=form.previous_school %}
+    {% include "learners/_field.html" with field=form.registration_date %}
+    {% include "learners/_field.html" with field=form.school_class %}
+  </div>
+
+  <div class="card">
+    <h2>Primary guardian</h2>
+    {% include "learners/_field.html" with field=form.guardian_name %}
+    {% include "learners/_field.html" with field=form.guardian_phone %}
+    {% include "learners/_field.html" with field=form.guardian_relationship %}
+    {% include "learners/_field.html" with field=form.guardian_email %}
+    {% if primary_matches %}
+      {% include "learners/_guardian_matches.html" with matches=primary_matches name="guardian_choice" %}
+    {% else %}
+      <input type="hidden" name="guardian_choice" value="{{ form.guardian_choice.value|default:'' }}">
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>Second guardian <span class="muted">(optional, becomes the alternative contact)</span></h2>
+    {% include "learners/_field.html" with field=form.alt_name %}
+    {% include "learners/_field.html" with field=form.alt_phone %}
+    {% include "learners/_field.html" with field=form.alt_relationship %}
+    {% if alt_matches %}
+      {% include "learners/_guardian_matches.html" with matches=alt_matches name="alt_choice" %}
+    {% else %}
+      <input type="hidden" name="alt_choice" value="{{ form.alt_choice.value|default:'' }}">
+    {% endif %}
+  </div>
+
+  {% if duplicates and can_override %}
+  <div class="card">{% include "learners/_field.html" with field=form.override_reason %}</div>
+  {% else %}
+  <input type="hidden" name="override_reason" value="">
+  {% endif %}
+
+  <div class="actions"><button class="btn" type="submit">Register</button> <a href="{% url 'learner_list' %}">Cancel</a></div>
+</form>
+{% endblock %}

@@ -1,4 +1,4 @@
-"""Settings for school-ms. Everything environment-specific comes from env vars."""
+"""Settings for the Kalulushi Trust school system. Environment-specific values come from env vars."""
 import os
 from pathlib import Path
 
@@ -25,10 +25,13 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "accounts",
+    "django.contrib.postgres",
+    "core",
     "school",
-    "people",
-    "academics",
+    "accounts",
+    "audit",
+    # Keep last: it re-applies role permissions once every app's permissions exist.
+    "learners",
 ]
 
 MIDDLEWARE = [
@@ -37,9 +40,16 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "core.context.RequestContextMiddleware",
+    "accounts.middleware.SessionActivityMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
+
+# Sign in with staff number, username or email (design §5). Being a ModelBackend,
+# it also refuses a deactivated user on their next request.
+AUTHENTICATION_BACKENDS = ["accounts.backends.StaffLoginBackend"]
+SESSION_ENGINE = "django.contrib.sessions.backends.db"
 
 ROOT_URLCONF = "config.urls"
 
@@ -53,7 +63,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
-                "school.context_processors.school_settings",
+                "core.context_processors.school",
             ],
         },
     },
@@ -93,6 +103,8 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+MEDIA_URL = "media/"
+MEDIA_ROOT = Path(env("DJANGO_MEDIA_ROOT", str(BASE_DIR / "media")))
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}{{ school.name|default:"School" }}{% endblock %}</title>
   <style>
-    :root { --ink:#1d2a33; --muted:#5b6b75; --line:#d9e1e6; --accent:#0b6e4f; --bg:#f6f8f9; --error:#a32020; }
+    :root { --ink:#1d2a33; --muted:#5b6b75; --line:#d9e1e6; --accent:#0b6e4f; --bg:#f6f8f9; --error:#a32020; --warn:#8a5a00; --warn-bg:#fff6e0; }
     * { box-sizing: border-box; }
     body { margin:0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color:var(--ink); background:var(--bg); line-height:1.5; }
     header { background:var(--accent); color:#fff; padding:.75rem 1rem; display:flex; flex-wrap:wrap; gap:1rem; align-items:center; justify-content:space-between; }
@@ -13,19 +13,42 @@
     header nav { display:flex; gap:1rem; align-items:center; flex-wrap:wrap; }
     header form { margin:0; }
     header button { background:none; border:1px solid #fff8; border-radius:4px; padding:.25rem .6rem; cursor:pointer; font:inherit; }
-    main { max-width:960px; margin:0 auto; padding:1.25rem 1rem; }
+    main { max-width:1040px; margin:0 auto; padding:1.25rem 1rem; }
+    h1 { font-size:1.5rem; margin:.25rem 0 1rem; }
+    h2 { font-size:1.15rem; margin:1.25rem 0 .5rem; }
     a { color:var(--accent); }
     table { width:100%; border-collapse:collapse; background:#fff; }
-    th, td { text-align:left; padding:.5rem; border-bottom:1px solid var(--line); }
+    th, td { text-align:left; padding:.5rem; border-bottom:1px solid var(--line); vertical-align:top; }
+    th { font-size:.85rem; color:var(--muted); font-weight:600; }
     .card { background:#fff; border:1px solid var(--line); border-radius:6px; padding:1rem; margin-bottom:1rem; }
     .muted { color:var(--muted); }
     .messages { list-style:none; padding:0; }
-    .messages li { background:#e5f4ee; border:1px solid #b5dccc; padding:.5rem .75rem; border-radius:4px; }
+    .messages li { background:#e5f4ee; border:1px solid #b5dccc; padding:.5rem .75rem; border-radius:4px; margin-bottom:.5rem; }
+    .messages li.error { background:#fbeaea; border-color:#e6b8b8; }
+    .warning { background:var(--warn-bg); border:1px solid #f0d48a; color:var(--warn); padding:.75rem; border-radius:4px; margin-bottom:1rem; }
     .errorlist { color:var(--error); margin:.25rem 0; padding-left:1rem; }
     label { display:block; font-weight:600; margin-top:.75rem; }
-    input, select { width:100%; max-width:24rem; padding:.45rem; border:1px solid var(--line); border-radius:4px; font:inherit; }
-    .btn { display:inline-block; background:var(--accent); color:#fff; border:0; border-radius:4px; padding:.5rem 1rem; text-decoration:none; cursor:pointer; font:inherit; margin-top:1rem; }
+    .helptext { display:block; color:var(--muted); font-size:.85rem; }
+    input, select, textarea { width:100%; max-width:28rem; padding:.45rem; border:1px solid var(--line); border-radius:4px; font:inherit; }
+    input[type=checkbox], input[type=radio] { width:auto; }
+    .btn { display:inline-block; background:var(--accent); color:#fff; border:0; border-radius:4px; padding:.5rem 1rem; text-decoration:none; cursor:pointer; font:inherit; }
+    .btn.secondary { background:#fff; color:var(--accent); border:1px solid var(--accent); }
+    .btn.danger { background:var(--error); }
+    .btn.small { padding:.2rem .6rem; font-size:.85rem; }
+    .actions { display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; margin:1rem 0; }
+    .actions form { margin:0; }
+    .tabs { display:flex; gap:.25rem; border-bottom:1px solid var(--line); margin-bottom:1rem; flex-wrap:wrap; }
+    .tabs a { padding:.5rem .9rem; text-decoration:none; border:1px solid transparent; border-bottom:0; border-radius:4px 4px 0 0; }
+    .tabs a.active { background:#fff; border-color:var(--line); color:var(--ink); font-weight:600; margin-bottom:-1px; }
+    .badge { display:inline-block; font-size:.75rem; padding:.05rem .45rem; border-radius:999px; background:#e8eef1; color:var(--ink); }
+    .badge.ok { background:#e5f4ee; color:var(--accent); }
+    .badge.warn { background:var(--warn-bg); color:var(--warn); }
+    dl.facts { display:grid; grid-template-columns:max-content 1fr; gap:.25rem 1rem; margin:0; }
+    dl.facts dt { color:var(--muted); }
+    dl.facts dd { margin:0; }
     .table-wrap { overflow-x:auto; }
+    .search { display:flex; gap:.5rem; flex-wrap:wrap; align-items:end; margin-bottom:1rem; }
+    .search input, .search select { width:auto; }
   </style>
 </head>
 <body>
@@ -34,14 +57,17 @@
     {% if user.is_authenticated %}
     <nav>
       <a href="{% url 'home' %}">Home</a>
-      {% if perms.people.view_student %}<a href="{% url 'student_list' %}">Pupils</a>{% endif %}
-      {% if user.is_staff %}<a href="{% url 'admin:index' %}">Admin</a>{% endif %}
+      {% if perms.learners.view_learner %}<a href="{% url 'learner_list' %}">Learners</a>{% endif %}
+      {% if perms.accounts.view_user %}<a href="{% url 'staff_list' %}">Staff</a>{% endif %}
+      {% if perms.audit.view_auditlog %}<a href="{% url 'admin:audit_auditlog_changelist' %}">Audit log</a>{% endif %}
+      {% if user.is_staff %}<a href="{% url 'admin:index' %}">School setup</a>{% endif %}
+      <a href="{% url 'staff_detail' user.pk %}">{{ user.first_name|default:user.username }}</a>
       <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button type="submit">Sign out</button></form>
     </nav>
     {% endif %}
   </header>
   <main>
-    {% if messages %}<ul class="messages">{% for m in messages %}<li>{{ m }}</li>{% endfor %}</ul>{% endif %}
+    {% if messages %}<ul class="messages">{% for m in messages %}<li class="{{ m.tags }}">{{ m }}</li>{% endfor %}</ul>{% endif %}
     {% block content %}{% endblock %}
   </main>
 </body>

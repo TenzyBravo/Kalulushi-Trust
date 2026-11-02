@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}{{ member.display_name }}{% endblock %}
+{% block content %}
+{% if perms.accounts.view_user %}<p class="muted"><a href="{% url 'staff_list' %}">Staff</a></p>{% endif %}
+<h1>{{ member.display_name }} {% if not member.is_active %}<span class="badge warn">Deactivated</span>{% endif %}</h1>
+<div class="card">
+  <dl class="facts">
+    <dt>Staff number</dt><dd>{{ member.staff_number }}</dd>
+    <dt>Username</dt><dd>{{ member.username }}</dd>
+    <dt>Email</dt><dd>{{ member.email|default:"–" }}</dd>
+    <dt>Phone</dt><dd>{{ member.phone|default:"–" }}</dd>
+    <dt>Roles</dt><dd>{% for r in roles %}<span class="badge">{{ r }}</span> {% empty %}–{% endfor %}</dd>
+    <dt>Last sign-in</dt><dd>{{ member.last_login|date:"d M Y H:i"|default:"never" }}</dd>
+    {% if member.deactivated_at %}<dt>Deactivated</dt><dd>{{ member.deactivated_at|date:"d M Y H:i" }} by {{ member.deactivated_by }}</dd>{% endif %}
+  </dl>
+</div>
+<div class="actions">
+  {% if manageable or member.pk == user.pk %}{% if perms.accounts.change_user %}<a class="btn secondary" href="{% url 'staff_edit' member.pk %}">Edit details</a>{% endif %}{% endif %}
+  {% if manageable %}<a class="btn secondary" href="{% url 'staff_roles' member.pk %}">Change roles</a>{% endif %}
+  {% if member.pk == user.pk %}<a class="btn secondary" href="{% url 'password_change' %}">Change my password</a>{% endif %}
+  {% if can_deactivate %}<a class="btn danger" href="{% url 'staff_deactivate' member.pk %}">Deactivate</a>{% endif %}
+</div>
+
+{% if assignments %}
+<h2>Teaching assignments</h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>Year</th><th>Class</th><th>Subject</th><th>Type</th><th>From</th><th>To</th><th>Status</th></tr></thead>
+  <tbody>{% for a in assignments %}
+    <tr><td>{{ a.class_subject.school_class.academic_year }}</td><td>{{ a.class_subject.school_class.name }}</td><td>{{ a.class_subject.subject.name }}</td>
+      <td>{{ a.get_assignment_type_display }}</td><td>{{ a.start_date|date:"d M Y" }}</td><td>{{ a.end_date|date:"d M Y"|default:"–" }}</td><td>{{ a.get_status_display }}</td></tr>
+  {% endfor %}</tbody>
+</table></div>
+{% endif %}
+
+{% if can_see_sessions %}
+<h2>Signed in on</h2>
+{% if sessions %}
+<div class="table-wrap"><table>
+  <thead><tr><th>Since</th><th>Last seen</th><th>From</th><th>Browser</th><th></th></tr></thead>
+  <tbody>{% for s in sessions %}
+    <tr><td>{{ s.created_at|date:"d M Y H:i" }}</td><td>{{ s.last_seen_at|date:"d M Y H:i" }}</td><td>{{ s.ip_address|default:"–" }}</td>
+      <td class="muted">{{ s.user_agent|truncatechars:60 }}</td>
+      <td>{% if member.pk == user.pk or manageable %}<form method="post" action="{% url 'session_revoke' member.pk s.pk %}">{% csrf_token %}<button class="btn small secondary">Sign out</button></form>{% endif %}</td></tr>
+  {% endfor %}</tbody>
+</table></div>
+{% else %}<p class="muted">No active sessions.</p>{% endif %}
+{% endif %}
+{% endblock %}

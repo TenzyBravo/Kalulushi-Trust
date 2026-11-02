@@ -1,0 +1,4 @@
+first_name,other_names,last_name,gender,date_of_birth,class,guardian_name,guardian_phone,guardian_email,relationship,previous_school
+Chilufya,,Mwansa,F,2016-03-14,4A,Mary Mwansa,0971234567,mary.mwansa@example.com,Mother,
+Mwila,Joseph,Mwansa,M,2018-07-02,2A,Mary Mwansa,+260 97 123 4567,,Mother,
+Natasha,,Banda,F,2012-11-25,F1A,Peter Banda,0961112233,,Father,Chibuluma Primary

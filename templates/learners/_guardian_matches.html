@@ -1,0 +1,8 @@
+<div class="warning">
+  <strong>This number already belongs to a guardian.</strong> Is it the same person?
+  {% for g in matches %}
+  <label><input type="radio" name="{{ name }}" value="{{ g.pk }}" required> Yes – link {{ g.full_name }}
+    <span class="muted">({% for link in g.learner_links.all %}{% if link.status == "active" %}{{ link.relationship|lower }} of {{ link.learner.first_name }} {{ link.learner.last_name }}{% if not forloop.last %}, {% endif %}{% endif %}{% endfor %})</span></label>
+  {% endfor %}
+  <label><input type="radio" name="{{ name }}" value="new" required> No – a different person sharing the number</label>
+</div>

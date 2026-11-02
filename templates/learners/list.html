@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Learners{% endblock %}
+{% block content %}
+<h1>Learners</h1>
+<form class="search" method="get">
+  <div><label for="q">Name or learner number</label><input id="q" name="q" value="{{ query }}" placeholder="e.g. Mwansa or KLT-0000018"></div>
+  <div><label for="class">Class</label>
+    <select id="class" name="class"><option value="">All{% if not perms.learners.view_all_learners %} my classes{% endif %}</option>
+      {% for c in classes %}<option value="{{ c.pk }}"{% if class_id == c.pk|stringformat:"s" %} selected{% endif %}>{{ c.name }}</option>{% endfor %}
+    </select></div>
+  <div><label for="status">Status</label>
+    <select id="status" name="status">{% for value, label in statuses %}<option value="{{ value }}"{% if value == status %} selected{% endif %}>{{ label }}</option>{% endfor %}<option value="all"{% if status == "all" %} selected{% endif %}>All</option></select></div>
+  <button class="btn" type="submit">Search</button>
+  {% if perms.learners.add_learner %}<a class="btn secondary" href="{% url 'learner_register' %}">Register a learner</a>{% endif %}
+</form>
+{% if hint %}<p class="warning">{{ hint }}</p>{% endif %}
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Number</th><th>Name</th><th>Class</th><th>Gender</th><th>Date of birth</th><th>Status</th></tr></thead>
+  <tbody>
+  {% for learner in page %}
+    <tr>
+      <td>{{ learner.learner_number }}</td>
+      <td><a href="{% url 'learner_detail' learner.pk %}">{{ learner.last_name }}, {{ learner.first_name }} {{ learner.other_names }}</a></td>
+      <td>{{ learner.enrollment.school_class.name|default:"–" }}</td>
+      <td>{{ learner.gender }}</td>
+      <td>{{ learner.date_of_birth|date:"d M Y"|default:"–" }}</td>
+      <td>{{ learner.get_status_display }}</td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="6" class="muted">No learners found.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% if page.has_other_pages %}
+<p class="actions">
+  {% if page.has_previous %}<a href="?q={{ query|urlencode }}&class={{ class_id }}&status={{ status }}&page={{ page.previous_page_number }}">Previous</a>{% endif %}
+  <span class="muted">Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
+  {% if page.has_next %}<a href="?q={{ query|urlencode }}&class={{ class_id }}&status={{ status }}&page={{ page.next_page_number }}">Next</a>{% endif %}
+</p>
+{% endif %}
+{% endblock %}

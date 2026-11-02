@@ -1,31 +1,30 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>Welcome, {{ user.get_full_name|default:user.username }}</h1>
-<p class="muted">Signed in as {{ user.get_role_display }}.</p>
-
-{% if can_view_pupils %}
+<h1>Welcome, {{ user.display_name }}</h1>
 <div class="card">
-  <h2>Pupils</h2>
-  <p>{{ pupil_count }} active pupil{{ pupil_count|pluralize }}.</p>
-  <a href="{% url 'student_list' %}">View pupils</a>
-  {% if can_add_pupils %} · <a href="{% url 'student_add' %}">Add a pupil</a>{% endif %}
+  <dl class="facts">
+    <dt>Academic year</dt><dd>{% if year %}{{ year }}{% else %}<span class="badge warn">None is current</span>{% if user.is_staff %} – set one in <a href="{% url 'admin:school_academicyear_changelist' %}">School setup</a>{% endif %}{% endif %}</dd>
+    {% if learner_count is not None %}<dt>Active learners{% if classes is not None %} in your classes{% endif %}</dt><dd>{{ learner_count }}</dd>{% endif %}
+    {% if unverified is not None %}<dt>Without a verified primary number</dt><dd>{{ unverified }}</dd>{% endif %}
+  </dl>
 </div>
+
+<div class="actions">
+  {% if perms.learners.add_learner %}
+    <a class="btn" href="{% url 'learner_register' %}">Register a learner</a>
+    <a class="btn secondary" href="{% url 'learner_import' %}">Import from CSV</a>
+  {% endif %}
+  {% if perms.learners.view_learner %}<a class="btn secondary" href="{% url 'learner_list' %}">Find a learner</a>{% endif %}
+</div>
+
+{% if classes is not None %}
+<h2>Your classes</h2>
+{% if classes %}
+<ul>{% for c in classes %}<li><a href="{% url 'learner_list' %}?class={{ c.pk }}">{{ c }}</a></li>{% endfor %}</ul>
+{% else %}<p class="muted">You are not assigned to any class yet.</p>{% endif %}
+{% if assignments %}
+<h2>Your subjects</h2>
+<ul>{% for a in assignments %}<li>{{ a.class_subject.subject.name }} – {{ a.class_subject.school_class.name }}{% if a.assignment_type == "backup" %} <span class="badge">backup</span>{% endif %}</li>{% endfor %}</ul>
 {% endif %}
-
-{% if user.is_admin_role %}
-<div class="card">
-  <h2>School setup</h2>
-  <p>Academic years, terms, levels, grades, classes, subjects, grading scales and staff are managed in the <a href="{% url 'admin:index' %}">admin</a>.</p>
-</div>
-{% elif user.is_head %}
-<div class="card">
-  <h2>School overview</h2>
-  <p>You can view all setup and pupil records in the <a href="{% url 'admin:index' %}">admin</a>.</p>
-</div>
-{% elif user.is_teacher %}
-<div class="card">
-  <h2>My classes</h2>
-  <p class="muted">Class lists, attendance and marks entry will appear here.</p>
-</div>
 {% endif %}
 {% endblock %}

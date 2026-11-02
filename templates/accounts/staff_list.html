@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Staff{% endblock %}
+{% block content %}
+<h1>Staff</h1>
+<div class="actions">
+  {% if can_add %}<a class="btn" href="{% url 'staff_create' %}">New staff account</a>{% endif %}
+  {% if show == "all" %}<a href="?show=active">Show active only</a>{% else %}<a href="?show=all">Include deactivated</a>{% endif %}
+</div>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Staff number</th><th>Name</th><th>Username</th><th>Roles</th><th>Status</th></tr></thead>
+  <tbody>
+  {% for member in staff %}
+    <tr>
+      <td>{{ member.staff_number }}</td>
+      <td><a href="{% url 'staff_detail' member.pk %}">{{ member.display_name }}</a></td>
+      <td>{{ member.username }}</td>
+      <td>{% for g in member.groups.all %}<span class="badge">{{ g.name }}</span> {% endfor %}</td>
+      <td>{% if member.is_active %}Active{% else %}<span class="badge warn">Deactivated</span>{% endif %}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}
