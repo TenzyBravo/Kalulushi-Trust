@@ -3,10 +3,11 @@ from django.contrib.auth.decorators import login_required, permission_required
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from learners.models import GuardianContact, Learner
+from learners.models import Enrollment, Guardian, GuardianContact, Learner
 from school.models import AcademicYear
 from staffing import access
 from staffing.models import ClassTeacherAssignment, CoverAuthorization, TeacherAssignment
@@ -20,26 +21,48 @@ from .models import User, UserSession
 def home(request):
     user = request.user
     year = AcademicYear.current()
-    ctx = {"year": year, "whole_school": access.sees_whole_school(user)}
+    ctx = {"year": year, "whole_school": access.sees_whole_school(user), "today": timezone.localdate()}
     if user.has_perm("learners.view_learner"):
         visible = access.visible_learners(user, Learner.objects.filter(status="active"))
         ctx["learner_count"] = visible.count()
     if ctx["whole_school"]:
+        learners_url = reverse("learner_list")
         unverified = GuardianContact.objects.filter(is_current=True, verified_at__isnull=True)
         no_primary = Learner.objects.filter(status="active").exclude(
             guardian_links__status="active", guardian_links__contact_role="primary")
         not_enrolled = Learner.objects.filter(status="active").exclude(
             enrollments__status="active", enrollments__end_date__isnull=True)
+        # (count, label, link). Only items with a count show in "Waiting on you".
         ctx["attention"] = [
-            (unverified.count(), "guardian numbers not yet verified (needed before results SMS)", None),
-            (no_primary.count(), "active learners with no primary contact", None),
-            (not_enrolled.count(), "active learners not enrolled in a class", None),
+            (unverified.count(), "guardian numbers to verify", learners_url),
+            (no_primary.count(), "learners without a primary contact", learners_url),
+            (not_enrolled.count(), "learners not in a class", learners_url),
         ]
         if year:
             ctx["classes"] = (year.classes.filter(status="active").select_related("grade")
                               .annotate(size=Count("enrollments", filter=Q(enrollments__status="active", enrollments__end_date__isnull=True))))
         else:
-            ctx["attention"].insert(0, (1, "no academic year is current: set one in School setup", None))
+            ctx["attention"].insert(0, (1, "academic year to make current", reverse("admin:school_academicyear_changelist")))
+        ctx["attention_total"] = sum(count for count, _, _ in ctx["attention"])
+        ctx["glance"] = [
+            {"value": ctx.get("learner_count", 0), "label": "Active learners", "tone": "green", "icon": "people",
+             "text": "Learners currently at the school", "link": learners_url, "link_text": "View learners"},
+            {"value": Enrollment.objects.filter(academic_year=year, status="active").count() if year else 0,
+             "label": f"Enrolments ({year})" if year else "Enrolments", "tone": "navy", "icon": "calendar",
+             "text": "Learners placed in a class this academic year", "link": learners_url, "link_text": "Browse by class"},
+            {"value": Guardian.objects.filter(status="active").count(), "label": "Guardians", "tone": "mint", "icon": "home",
+             "text": "Parents and guardians on record", "link": learners_url, "link_text": "Find a family"},
+            {"value": unverified.count(), "label": "Numbers to verify", "tone": "rose", "icon": "phone",
+             "text": "Guardian phones not yet confirmed, needed before results go by SMS", "link": learners_url,
+             "link_text": "Start verifying"},
+            {"value": len(ctx["classes"]) if year else 0, "label": "Classes", "tone": "violet", "icon": "building",
+             "text": f"Active classes in {year}" if year else "No academic year is current yet",
+             "link": reverse("assignments") if user.has_perm("staffing.view_teacherassignment") else None,
+             "link_text": "Teacher assignments"},
+            {"value": User.objects.filter(is_active=True).count(), "label": "Staff", "tone": "amber", "icon": "badge",
+             "text": "Active staff accounts", "link": reverse("staff_list") if user.has_perm("accounts.view_user") else None,
+             "link_text": "Manage staff"},
+        ]
     if user.has_role(roles.TEACHER):
         today = timezone.localdate()
         ctx["my_subjects"] = TeacherAssignment.objects.filter(

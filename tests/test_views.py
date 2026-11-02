@@ -38,6 +38,27 @@ class ScreenTests(TestCase):
         for url in pages:
             self.assertEqual(self.client.get(url).status_code, 200, url)
 
+    def test_dashboard_for_whole_school_roles(self):
+        self.login(self.admin)
+        response = self.client.get("/")
+        self.assertContains(response, "Welcome back")
+        self.assertContains(response, "Waiting on")
+        self.assertContains(response, "guardian numbers to verify")  # both registered numbers are unverified
+        glance = {card["label"]: card["value"] for card in response.context["glance"]}
+        self.assertEqual(glance["Active learners"], 2)
+        self.assertEqual(glance["Enrolments (2026)"], 2)
+        self.assertEqual(glance["Numbers to verify"], 2)
+        self.assertEqual(glance["Classes"], 2)
+        self.assertEqual(glance["Staff"], 3)
+
+    def test_dashboard_for_teachers_shows_their_own_classes(self):
+        self.login(self.teacher)
+        response = self.client.get("/")
+        self.assertContains(response, "My learners")
+        self.assertNotContains(response, "Waiting on")
+        self.assertNotIn("glance", response.context)
+        self.assertEqual(response.context["learner_count"], 1)
+
     def test_register_through_the_screen(self):
         self.login(self.head)
         data = {"first_name": "Bwalya", "last_name": "Zulu", "date_of_birth": "2018-05-05", "gender": "M",
