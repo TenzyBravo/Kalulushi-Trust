@@ -1,7 +1,7 @@
 """The rules the design states as database rules hold even when application code is bypassed."""
 import datetime
 
-from django.db import IntegrityError, InternalError, transaction
+from django.db import DatabaseError, IntegrityError, transaction
 from django.test import TestCase
 from django.utils import timezone
 
@@ -130,11 +130,11 @@ class AuditLogIsAppendOnly(TestCase):
         self.entry = AuditLog.objects.first()
 
     def test_update_refused_by_database(self):
-        with self.assertRaises(InternalError):
+        with self.assertRaisesMessage(DatabaseError, "append-only"):
             AuditLog.objects.filter(pk=self.entry.pk).update(reason="tampered")
 
     def test_delete_refused_by_database(self):
-        with self.assertRaises(InternalError):
+        with self.assertRaisesMessage(DatabaseError, "append-only"):
             AuditLog.objects.filter(pk=self.entry.pk).delete()
 
     def test_model_refuses_save_and_delete(self):
