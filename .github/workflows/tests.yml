@@ -40,4 +40,6 @@ jobs:
       - name: Migrate from empty
         run: python manage.py migrate
       - name: Tests
-        run: python manage.py test tests -v 2
+        run: |
+          set -o pipefail
+          python manage.py test tests -v 2 2>&1 | tee test.log || { python .github/annotate_failures.py test.log; exit 1; }
