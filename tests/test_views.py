@@ -58,7 +58,10 @@ class ScreenTests(TestCase):
         self.login(self.teacher)
         response = self.client.get("/")
         self.assertContains(response, "My learners")
-        self.assertNotContains(response, "Waiting on")
+        # Teachers get their own to-do bar (registers and absence cases), never the school-wide items.
+        self.assertContains(response, "Waiting on")
+        self.assertNotContains(response, "registers not taken today")
+        self.assertNotContains(response, "guardian numbers to verify")
         self.assertNotIn("glance", response.context)
         self.assertEqual(response.context["learner_count"], 1)
 
