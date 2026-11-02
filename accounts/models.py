@@ -17,6 +17,11 @@ from . import roles
 
 
 class UserManager(DjangoUserManager):
+    @classmethod
+    def normalize_email(cls, email):
+        # No email is stored as NULL, so the unique-email rule ignores accounts without one.
+        return super().normalize_email(email) or None
+
     def _create_user(self, username, email, password, **extra_fields):
         if "school" not in extra_fields and "school_id" not in extra_fields:
             extra_fields["school"] = School.current()
