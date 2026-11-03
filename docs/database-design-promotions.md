@@ -1,7 +1,7 @@
 # Database Design — Promotions and Transfers with Approval
 
-**Status:** Draft for review — decisions P1–P7 need answers\
-**Version:** 0.1\
+**Status:** Approved 3 November 2026 — P1–P7 accepted as recommended\
+**Version:** 1.0\
 **Date:** 3 November 2026\
 **Implements:** Requirements baseline v1.1, §5 "Requests and approvals", "Transfers", "Mid-term transfer report
 card rule"; completes the `enrollments.request_id` link that [slice 1](database-design-foundation.md) left
