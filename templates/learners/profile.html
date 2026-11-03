@@ -3,6 +3,7 @@
 {% block content %}
 <h1>{{ learner.full_name }} <span class="tag{% if learner.status == 'active' %} ok{% endif %}">{{ learner.status }}</span></h1>
 <p class="muted">{{ learner.learner_number }}{% if current %} · {{ current.class_group.name }}, {{ current.academic_year }}{% else %} · not enrolled in a class{% endif %}</p>
+{% if perms.reports.view_reports %}<div class="actions"><a class="btn secondary small" href="{% url 'report' 'learner' %}?learner={{ learner.pk }}">Full report</a></div>{% endif %}
 <nav class="tabs">{% for key, label, later in tabs %}<a href="?tab={{ key }}"{% if key == tab %} class="on"{% endif %}>{{ label }}</a>{% endfor %}</nav>
 
 {% if tab == "personal" %}

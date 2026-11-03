@@ -13,6 +13,7 @@ MODULES = [
     ("learners", "Learners and guardians"),
     ("attendance", "Attendance and follow-up"),
     ("assessment", "Assessments and competencies"),
+    ("reports", "Reports and exports"),
     ("staffing", "Teaching assignments and cover"),
     ("school", "School structure"),
     ("accounts", "Staff accounts"),
@@ -21,7 +22,7 @@ MODULES = [
 
 # Shown with a shield: personal or medical information, or the record of who did what.
 SENSITIVE = {"learners.view_support_notes", "learners.add_learnersupportnote", "learners.change_learnersupportnote",
-             "core.view_audit_log"}
+             "core.view_audit_log", "reports.view_reportexport"}
 
 TYPE_OVERRIDES = {
     "accounts.manage_staff": "admin",
@@ -39,6 +40,8 @@ TYPE_OVERRIDES = {
     "learners.request_transfer": "create",
     "learners.prepare_promotions": "create",
     "learners.approve_enrollment_requests": "admin",
+    "reports.view_reports": "view",
+    "reports.view_reportexport": "sensitive",
 }
 
 DESCRIPTIONS = {
@@ -51,6 +54,8 @@ DESCRIPTIONS = {
     "learners.request_transfer": "Ask the Headteacher to move a learner they teach to another class.",
     "learners.prepare_promotions": "Prepare a class's year-end promotion sheet (class teacher, or office).",
     "learners.approve_enrollment_requests": "Approve or return promotion sheets and approve or reject transfers.",
+    "reports.view_reports": "Open and export reports, for the classes and learners they can see on screen.",
+    "reports.view_reportexport": "See the exports log: who exported which report, when, with which filters.",
     "learners.import_learners": "Register many learners at once from the Excel template.",
     "attendance.take_register": "Take the daily register, for a class they are class teacher of.",
     "attendance.correct_attendance": "Correct any class's register, with a reason.",

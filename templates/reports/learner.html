@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}{{ result.title }}{% endblock %}
+{% block content %}
+<p class="muted"><a href="{% url 'learner_profile' learner.pk %}">{{ learner.full_name }}</a> · <a href="{% url 'reports' %}">Reports</a></p>
+<div class="section-head">
+  <div><p class="section-eyebrow">Individual learner report · {{ learner.learner_number }}</p><h1 class="section-title">{{ learner.full_name }}</h1></div>
+  <div class="actions"><a class="btn secondary" href="?{{ query }}&format=xlsx">Download Excel</a>
+    <a class="btn secondary" href="?{{ query }}&format=print" target="_blank">Print / PDF</a></div>
+</div>
+{% for table in result.tables %}{% include "reports/_table.html" %}{% endfor %}
+<p class="muted small">Exporting this report is recorded in the audit log. Medical and support notes are never included.</p>
+{% endblock %}
