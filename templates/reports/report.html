@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}{{ result.title|default:title }}{% endblock %}
+{% block content %}
+<p class="muted"><a href="{% url 'reports' %}">Reports</a>{% for label, url in result.crumbs %} › <a href="{{ url }}">{{ label }}</a>{% endfor %}</p>
+<div class="section-head">
+  <div><p class="section-eyebrow">{{ scope.text }}</p><h1 class="section-title">{{ result.title|default:title }}</h1></div>
+  {% if result %}<div class="actions">
+    <a class="btn secondary" href="?{{ query }}&format=xlsx">{% include "icons.html" with name="upload" %} Download Excel</a>
+    <a class="btn secondary" href="?{{ query }}&format=print" target="_blank">Print / PDF</a></div>{% endif %}
+</div>
+{% if not result %}<div class="notice">No academic year is set up yet.</div>{% else %}
+<form method="get" class="inline-form card">
+  {% if request.GET.grade %}<input type="hidden" name="grade" value="{{ request.GET.grade }}">{% endif %}
+  {% if request.GET.cls %}<input type="hidden" name="cls" value="{{ request.GET.cls }}">{% endif %}
+  <div><label for="year">Year</label><select id="year" name="year">{% for y in years %}<option value="{{ y.pk }}"{% if y == scope.year %} selected{% endif %}>{{ y }}</option>{% endfor %}</select></div>
+  <div><label for="term">Term</label><select id="term" name="term">
+    {% if not uses_term %}<option value="year"{% if not scope.term %} selected{% endif %}>Whole year</option>{% endif %}
+    {% for t in terms %}<option value="{{ t.pk }}"{% if t == scope.term %} selected{% endif %}>Term {{ t.number }}</option>{% endfor %}</select></div>
+  {% if not uses_term %}
+  <div><label for="from">From</label><input type="date" id="from" name="from" value="{{ request.GET.from }}"></div>
+  <div><label for="to">To</label><input type="date" id="to" name="to" value="{{ request.GET.to }}"></div>
+  {% endif %}
+  {% if subjects %}<div><label for="subject">Subject</label><select id="subject" name="subject"><option value="">All</option>
+    {% for s in subjects %}<option value="{{ s.pk }}"{% if subject_id == s.pk|stringformat:"s" %} selected{% endif %}>{{ s.name }}</option>{% endfor %}</select></div>{% endif %}
+  <button class="btn" type="submit">Apply</button>
+</form>
+{% for table in result.tables %}{% include "reports/_table.html" %}{% endfor %}
+{% if result.sensitive %}<p class="muted small">This report lists individual learners. Exporting it is recorded in the audit log.</p>{% endif %}
+{% endif %}
+{% endblock %}

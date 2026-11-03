@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>{{ result.title }}</title>
+<style>
+  @page { size: A4; margin: 14mm 12mm 16mm; }
+  body { font-family: "Figtree", system-ui, "Segoe UI", sans-serif; color: #1d2a33; font-size: 10pt; margin: 0 auto; max-width: 190mm; }
+  header { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #0f2f4c; padding-bottom: 6px; margin-bottom: 10px; }
+  header h1 { font-family: Georgia, serif; font-size: 16pt; margin: 0; color: #0f2f4c; }
+  .muted { color: #5b6b75; } .small { font-size: 8.5pt; }
+  h2 { font-size: 11.5pt; margin: 14px 0 4px; color: #0f2f4c; }
+  table { width: 100%; border-collapse: collapse; }
+  tr { page-break-inside: avoid; }
+  th, td { border-bottom: 1px solid #d9dee2; padding: 3px 5px; text-align: left; vertical-align: top; }
+  th { background: #eef2f4; font-size: 8.5pt; text-transform: uppercase; letter-spacing: .04em; }
+  .report-total td { font-weight: 700; border-top: 1.5px solid #1d2a33; }
+  .tone-bad { color: #b42318; font-weight: 700; } .tone-warn { color: #9a5b00; } .tone-good { color: #127a46; }
+  .no-print { margin: 10px 0; }
+  @media print { .no-print { display: none; } }
+</style></head>
+<body>
+<div class="no-print"><button onclick="window.print()">Print or save as PDF</button></div>
+<header>
+  <div><div class="muted small">{{ school.name }}</div><h1>{{ result.title }}</h1><div class="muted small">{{ scope_text }}</div></div>
+  <div class="muted small">Printed {{ printed|date:"j M Y H:i" }} by {{ user.get_full_name|default:user.username }}</div>
+</header>
+{% with printing=True %}{% for table in result.tables %}{% include "reports/_table.html" %}{% endfor %}{% endwith %}
+{% if result.sensitive %}<p class="muted small">Confidential: contains individual learner information.</p>{% endif %}
+</body></html>

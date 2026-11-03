@@ -43,6 +43,8 @@ ASSESSMENT_SETUP_MODELS = [
     "assessment.assessmentcomponent", "assessment.competencyframework", "assessment.competency", "assessment.competencylevel",
 ]
 PROMOTION_REQUESTS = ["learners.request_transfer", "learners.prepare_promotions"]
+# Reports: everyone sees reports for what they can see on screen; the exports log is for SA and Head.
+REPORTS = ["reports.view_reports"]
 ASSESSMENT_OFFICE = ["assessment.view_assessment", "assessment.view_assessmentresult", "assessment.view_competencysheet",
                      "assessment.correct_marks"]
 
@@ -62,7 +64,7 @@ ROLE_PERMISSIONS = {
            "learners.import_learners", "core.view_audit_log"]
         + ATTENDANCE_OFFICE + CALENDAR_MANAGEMENT + ["attendance.review_escalations"]
         + _model_perms(ASSESSMENT_SETUP_MODELS, ["add", "change", "view"]) + ASSESSMENT_OFFICE
-        + PROMOTION_REQUESTS
+        + PROMOTION_REQUESTS + REPORTS + ["reports.view_reportexport"]
     ),
     HEADTEACHER: (
         _model_perms(STRUCTURE, ["view"])
@@ -74,7 +76,7 @@ ROLE_PERMISSIONS = {
         + ATTENDANCE_OFFICE + ["attendance.review_escalations"]
         + _model_perms(ASSESSMENT_SETUP_MODELS, ["view"]) + ASSESSMENT_OFFICE
         # Only the Headteacher approves promotions and transfers (promotions design, P4).
-        + PROMOTION_REQUESTS + ["learners.approve_enrollment_requests"]
+        + PROMOTION_REQUESTS + ["learners.approve_enrollment_requests"] + REPORTS + ["reports.view_reportexport"]
     ),
     ACADEMIC_ADMIN: (
         _model_perms(STRUCTURE, ["add", "change", "view"])
@@ -84,7 +86,7 @@ ROLE_PERMISSIONS = {
            "learners.override_duplicate", "learners.import_learners"]
         + ATTENDANCE_OFFICE + CALENDAR_MANAGEMENT
         + _model_perms(ASSESSMENT_SETUP_MODELS, ["add", "change", "view"]) + ASSESSMENT_OFFICE
-        + PROMOTION_REQUESTS
+        + PROMOTION_REQUESTS + REPORTS
     ),
     # Teachers see learners only in their assigned classes (staffing.access).
     # Support notes need view_support_notes granted to the individual teacher.
@@ -95,7 +97,7 @@ ROLE_PERMISSIONS = {
               "attendance.view_absencecase", "attendance.change_absencecase", "attendance.view_calendarevent",
               "assessment.enter_marks", "assessment.record_competencies", "assessment.view_assessment",
               "assessment.view_assessmentresult", "assessment.view_competencysheet",
-              "learners.request_transfer", "learners.prepare_promotions"],
+              "learners.request_transfer", "learners.prepare_promotions", "reports.view_reports"],
 }
 
 

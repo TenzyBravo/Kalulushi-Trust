@@ -140,6 +140,11 @@
     .perm-role { display:inline-block; padding:.1rem .55rem; border-radius:999px; background:#e3f5ea; color:#127a46; font-size:.78rem; font-weight:700; white-space:nowrap; }
     .perm-role.individual { background:#fff1d6; color:#9a5b00; }
 
+    /* Reports */
+    td.tone-good { color:#127a46; font-weight:700; } td.tone-warn { color:#9a5b00; font-weight:700; } td.tone-bad { color:#b42318; font-weight:700; }
+    tr.report-total td { font-weight:700; border-top:2px solid var(--ink); }
+    .report-table h2 { margin-top:1.5rem; }
+
     /* Assessments */
     .marks-table td { vertical-align:middle; }
     .marks-table input.mark-input { width:5.5rem; text-align:right; font-weight:700; }
@@ -221,6 +226,7 @@
       {% if perms.assessment.view_assessment %}<a href="{% url 'assessment_home' %}">Assessments</a>{% endif %}
       {% if perms.learners.view_learner %}<a href="{% url 'learner_list' %}">Learners</a>{% endif %}
       {% if perms.learners.prepare_promotions %}<a href="{% url 'promotions' %}">Promotions</a>{% endif %}
+      {% if perms.reports.view_reports %}<a href="{% url 'reports' %}">Reports</a>{% endif %}
       {% if perms.learners.add_learner %}<a href="{% url 'learner_register' %}">Register</a>{% endif %}
       {% if perms.learners.import_learners %}<a href="{% url 'learner_import' %}">Import</a>{% endif %}
       {% if perms.staffing.view_teacherassignment %}<a href="{% url 'assignments' %}">Assignments</a>{% endif %}

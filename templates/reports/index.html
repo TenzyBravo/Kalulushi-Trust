@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Reports{% endblock %}
+{% block content %}
+<p class="section-eyebrow">Drill down from the whole school to a class and a learner</p>
+<h1 class="section-title">Reports</h1>
+<p class="section-intro">Every figure is calculated from the registers, marks and records as they are now. Each report downloads as
+Excel and has a print view (use your browser's <em>Save as PDF</em> for a PDF).</p>
+<div class="explore">
+  {% for key, item in reports.items %}
+  <a class="explore-card" href="{% url 'report' key %}">
+    <span class="explore-icon">{% include "icons.html" with name="calendar" %}</span>
+    <span class="explore-body"><span class="explore-value">{{ item.0 }}</span><span class="explore-name">{{ item.1 }}</span></span>
+    <span class="explore-chevron" aria-hidden="true">›</span>
+  </a>
+  {% endfor %}
+  <div class="explore-card" aria-disabled="true">
+    <span class="explore-icon">{% include "icons.html" with name="book" %}</span>
+    <span class="explore-body"><span class="explore-value">Report-card status</span><span class="explore-name">Arrives with report cards</span></span>
+  </div>
+</div>
+<p class="muted">The individual learner report opens from each learner's profile (<strong>Full report</strong>).
+{% if perms.reports.view_reportexport %} · <a href="{% url 'report_exports' %}">Exports log</a>{% endif %}</p>
+{% endblock %}

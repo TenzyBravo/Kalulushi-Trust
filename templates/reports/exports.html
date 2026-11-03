@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Exports log{% endblock %}
+{% block content %}
+<p class="muted"><a href="{% url 'reports' %}">Reports</a></p>
+<h1 class="section-title">Exports log</h1>
+<div class="table-wrap card flush"><table>
+  <thead><tr><th>When</th><th>Who</th><th>Report</th><th>Format</th><th>Filters</th><th>Rows</th><th></th></tr></thead>
+  <tbody>{% for e in page %}
+    <tr><td>{{ e.created_at|date:"j M Y H:i" }}</td><td>{{ e.user }}</td><td>{{ e.report }}</td><td>{{ e.format }}</td>
+      <td class="small">{% for k, v in e.filters.items %}{{ k }}: {{ v }}{% if not forloop.last %} · {% endif %}{% endfor %}</td>
+      <td>{{ e.row_count }}</td><td>{% if e.sensitive %}<span class="tag warn">learner data</span>{% endif %}</td></tr>
+  {% empty %}<tr><td colspan="7" class="muted">No exports yet.</td></tr>{% endfor %}</tbody>
+</table></div>
+{% if page.has_other_pages %}<p class="actions">{% if page.has_previous %}<a href="?page={{ page.previous_page_number }}">Previous</a>{% endif %}
+  <span class="muted">Page {{ page.number }} of {{ page.paginator.num_pages }}</span>{% if page.has_next %}<a href="?page={{ page.next_page_number }}">Next</a>{% endif %}</p>{% endif %}
+{% endblock %}
