@@ -54,8 +54,11 @@ class Learner(models.Model):
         permissions = [
             ("override_duplicate", "Can save a learner despite a likely-duplicate warning"),
             ("view_support_notes", "Can view learner medical and support notes"),
-            ("transfer_learner", "Can transfer a learner between classes"),
+            ("transfer_learner", "Can carry out an approved transfer between classes"),
             ("import_learners", "Can bulk-import learners"),
+            ("request_transfer", "Can request a class transfer for a learner they teach"),
+            ("prepare_promotions", "Can prepare a class's year-end promotion sheet"),
+            ("approve_enrollment_requests", "Can approve promotion sheets and transfer requests"),
         ]
 
     def __str__(self):
@@ -203,7 +206,8 @@ class Enrollment(models.Model):
     status = models.TextField(choices=choices("active", "ended", "reversed"), default="active")
     end_reason = models.TextField(choices=choices(*END_REASONS), blank=True)
     previous_enrollment = models.ForeignKey("self", on_delete=models.PROTECT, null=True, blank=True, related_name="+")
-    request_id = models.BigIntegerField(null=True, blank=True, help_text="Promotion/transfer request (slice 6).")
+    request = models.ForeignKey("EnrollmentRequest", on_delete=models.PROTECT, null=True, blank=True,
+                                related_name="+", help_text="The approved promotion or transfer request that created it.")
     reason = models.TextField(blank=True)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
     approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name="+")
@@ -242,3 +246,96 @@ class Enrollment(models.Model):
 
     def __str__(self):
         return f"{self.learner.full_name} in {self.class_group.name} from {self.start_date}"
+
+
+PROMOTION_DECISIONS = ["promote", "repeat", "hold", "complete", "leaving"]
+REQUEST_STATUSES = ["draft", "pending", "approved", "rejected", "cancelled"]
+BATCH_STATUSES = ["draft", "submitted", "returned", "approved"]
+
+
+class PromotionBatch(models.Model):
+    """One class's year-end promotion sheet (promotions design §3). A class is promoted once."""
+
+    DRAFT, SUBMITTED, RETURNED, APPROVED = BATCH_STATUSES
+
+    school = models.ForeignKey(School, on_delete=models.PROTECT)
+    from_class = models.OneToOneField(ClassGroup, on_delete=models.PROTECT, related_name="promotion_batch")
+    from_year = models.ForeignKey(AcademicYear, on_delete=models.PROTECT, related_name="+")
+    to_year = models.ForeignKey(AcademicYear, on_delete=models.PROTECT, related_name="+")
+    status = models.TextField(choices=choices(*BATCH_STATUSES), default=DRAFT)
+    prepared_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    decided_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name="+")
+    decided_at = models.DateTimeField(null=True, blank=True)
+    decision_note = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "promotion_batches"
+        ordering = ["from_class__grade__sequence", "from_class__stream"]
+        constraints = [
+            status_check("promotion_batches_status_valid", "status", BATCH_STATUSES),
+            models.CheckConstraint(condition=~Q(to_year=F("from_year")), name="promotion_batches_years_differ"),
+            models.CheckConstraint(condition=~Q(status="approved") | Q(decided_by__isnull=False, decided_at__isnull=False),
+                                   name="promotion_batches_approval_complete"),
+        ]
+
+    def __str__(self):
+        return f"{self.from_class.name} promotion to {self.to_year}"
+
+
+class EnrollmentRequest(models.Model):
+    """A transfer, or one learner's year-end decision, waiting for or given the Headteacher's approval."""
+
+    PROMOTION, TRANSFER = "promotion", "transfer"
+    PROMOTE, REPEAT, HOLD, COMPLETE, LEAVING = PROMOTION_DECISIONS
+    DRAFT, PENDING, APPROVED, REJECTED, CANCELLED = REQUEST_STATUSES
+
+    school = models.ForeignKey(School, on_delete=models.PROTECT)
+    kind = models.TextField(choices=choices(PROMOTION, TRANSFER))
+    batch = models.ForeignKey(PromotionBatch, on_delete=models.PROTECT, null=True, blank=True, related_name="requests")
+    learner = models.ForeignKey(Learner, on_delete=models.PROTECT, related_name="enrollment_requests")
+    from_enrollment = models.ForeignKey(Enrollment, on_delete=models.PROTECT, related_name="outgoing_requests")
+    decision = models.TextField(choices=choices(*PROMOTION_DECISIONS), blank=True)
+    to_class = models.ForeignKey(ClassGroup, on_delete=models.PROTECT, null=True, blank=True, related_name="incoming_requests")
+    effective_date = models.DateField()
+    note = models.TextField(blank=True)
+    status = models.TextField(choices=choices(*REQUEST_STATUSES), default=DRAFT)
+    requested_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    decided_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name="+")
+    decided_at = models.DateTimeField(null=True, blank=True)
+    decision_note = models.TextField(blank=True)
+    resulting_enrollment = models.ForeignKey(Enrollment, on_delete=models.PROTECT, null=True, blank=True, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "enrollment_requests"
+        ordering = ["-created_at"]
+        constraints = [
+            status_check("enrollment_requests_kind_valid", "kind", ["promotion", "transfer"]),
+            status_check("enrollment_requests_status_valid", "status", REQUEST_STATUSES),
+            models.CheckConstraint(condition=Q(decision="") | Q(decision__in=PROMOTION_DECISIONS),
+                                   name="enrollment_requests_decision_valid"),
+            # Promotions belong to a batch and carry a decision; transfers have neither.
+            models.CheckConstraint(
+                condition=Q(kind="promotion", batch__isnull=False) | Q(kind="transfer", batch__isnull=True, decision=""),
+                name="enrollment_requests_kind_shape",
+            ),
+            # A destination class exactly when the learner moves into one.
+            models.CheckConstraint(
+                condition=Q(to_class__isnull=False) & (Q(kind="transfer") | Q(decision__in=["promote", "repeat"]))
+                | Q(to_class__isnull=True) & Q(kind="promotion") & ~Q(decision__in=["promote", "repeat"]),
+                name="enrollment_requests_destination",
+            ),
+            models.CheckConstraint(condition=~Q(status__in=["approved", "rejected"]) | Q(decided_by__isnull=False),
+                                   name="enrollment_requests_decider"),
+            models.UniqueConstraint(fields=["batch", "learner"], condition=Q(batch__isnull=False),
+                                    name="enrollment_requests_one_per_batch"),
+            models.UniqueConstraint(fields=["learner"], condition=Q(kind="transfer", status="pending"),
+                                    name="enrollment_requests_one_open_transfer"),
+        ]
+
+    def __str__(self):
+        return f"{self.get_kind_display()} for {self.learner}: {self.decision or (self.to_class.name if self.to_class else '')}"

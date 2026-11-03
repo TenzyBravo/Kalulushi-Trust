@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Review {{ batch.from_class.name }} promotions{% endblock %}
+{% block content %}
+<p class="muted"><a href="{% url 'promotion_approvals' %}">Approvals</a></p>
+<p class="section-eyebrow">Promotion sheet · {{ batch.from_class.grade.name }} → {{ batch.to_year }}</p>
+<h1 class="section-title">{{ batch.from_class.name }}</h1>
+<p class="muted">Prepared by {{ batch.prepared_by }}, submitted {{ batch.submitted_at|date:"j M Y H:i" }}.</p>
+{% if errors %}<div class="danger-zone"><ul class="errorlist">{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul></div>{% endif %}
+
+<div class="card">
+  <h2 style="margin-top:0">What will happen</h2>
+  <ul>{% for d, c, n in summary.lines %}
+    <li><strong>{{ n }}</strong> {% if d == "promote" %}promoted to {{ c }}{% elif d == "repeat" %}repeat in {{ c }}{% elif d == "hold" %}held for review (no class yet){% elif d == "complete" %}complete their schooling{% else %}leave the school{% endif %}</li>
+  {% endfor %}</ul>
+  <p class="small muted">Current enrolments end on {{ batch.from_year.end_date|date:"j M Y" }}; new ones start on {{ batch.to_year.start_date|date:"j M Y" }}. This cannot be run twice.</p>
+</div>
+
+<div class="table-wrap card flush"><table>
+  <thead><tr><th>Learner</th><th>Decision</th><th>Class</th><th>Note</th></tr></thead>
+  <tbody>{% for r in requests %}
+    <tr><td>{{ r.learner.full_name }}</td><td>{{ r.get_decision_display }}</td><td>{{ r.to_class.name|default:"—" }}</td><td class="small">{{ r.note }}</td></tr>
+  {% endfor %}</tbody>
+</table></div>
+
+<div class="grid">
+  <form method="post" class="card">{% csrf_token %}<input type="hidden" name="action" value="approve">
+    <h2 style="margin-top:0">Approve</h2>
+    <label><input type="checkbox" name="confirm" value="yes"> I have checked these {{ summary.total }} decisions</label>
+    <div class="actions"><button class="btn" type="submit">Approve and process</button></div>
+  </form>
+  <form method="post" class="card">{% csrf_token %}<input type="hidden" name="action" value="return">
+    <h2 style="margin-top:0">Return to {{ batch.prepared_by }}</h2>
+    <textarea name="note" rows="2" placeholder="What needs changing"></textarea>
+    <div class="actions"><button class="btn secondary" type="submit">Return with note</button></div>
+  </form>
+</div>
+{% endblock %}

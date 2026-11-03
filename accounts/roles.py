@@ -42,6 +42,7 @@ ASSESSMENT_SETUP_MODELS = [
     "assessment.gradingscheme", "assessment.gradeband", "assessment.assessmenttype", "assessment.assessmentplan",
     "assessment.assessmentcomponent", "assessment.competencyframework", "assessment.competency", "assessment.competencylevel",
 ]
+PROMOTION_REQUESTS = ["learners.request_transfer", "learners.prepare_promotions"]
 ASSESSMENT_OFFICE = ["assessment.view_assessment", "assessment.view_assessmentresult", "assessment.view_competencysheet",
                      "assessment.correct_marks"]
 
@@ -61,6 +62,7 @@ ROLE_PERMISSIONS = {
            "learners.import_learners", "core.view_audit_log"]
         + ATTENDANCE_OFFICE + CALENDAR_MANAGEMENT + ["attendance.review_escalations"]
         + _model_perms(ASSESSMENT_SETUP_MODELS, ["add", "change", "view"]) + ASSESSMENT_OFFICE
+        + PROMOTION_REQUESTS
     ),
     HEADTEACHER: (
         _model_perms(STRUCTURE, ["view"])
@@ -71,6 +73,8 @@ ROLE_PERMISSIONS = {
            "learners.import_learners", "core.view_audit_log"]
         + ATTENDANCE_OFFICE + ["attendance.review_escalations"]
         + _model_perms(ASSESSMENT_SETUP_MODELS, ["view"]) + ASSESSMENT_OFFICE
+        # Only the Headteacher approves promotions and transfers (promotions design, P4).
+        + PROMOTION_REQUESTS + ["learners.approve_enrollment_requests"]
     ),
     ACADEMIC_ADMIN: (
         _model_perms(STRUCTURE, ["add", "change", "view"])
@@ -80,6 +84,7 @@ ROLE_PERMISSIONS = {
            "learners.override_duplicate", "learners.import_learners"]
         + ATTENDANCE_OFFICE + CALENDAR_MANAGEMENT
         + _model_perms(ASSESSMENT_SETUP_MODELS, ["add", "change", "view"]) + ASSESSMENT_OFFICE
+        + PROMOTION_REQUESTS
     ),
     # Teachers see learners only in their assigned classes (staffing.access).
     # Support notes need view_support_notes granted to the individual teacher.
@@ -89,7 +94,8 @@ ROLE_PERMISSIONS = {
               "attendance.take_register", "attendance.view_attendancesession",
               "attendance.view_absencecase", "attendance.change_absencecase", "attendance.view_calendarevent",
               "assessment.enter_marks", "assessment.record_competencies", "assessment.view_assessment",
-              "assessment.view_assessmentresult", "assessment.view_competencysheet"],
+              "assessment.view_assessmentresult", "assessment.view_competencysheet",
+              "learners.request_transfer", "learners.prepare_promotions"],
 }
 
 

@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Approvals{% endblock %}
+{% block content %}
+<p class="muted"><a href="{% url 'promotions' %}">Promotions</a></p>
+<p class="section-eyebrow">Headteacher</p>
+<h1 class="section-title">Approvals</h1>
+
+<h2>Promotion sheets</h2>
+<div class="table-wrap card flush"><table>
+  <thead><tr><th>Class</th><th>Prepared by</th><th>Summary</th><th></th></tr></thead>
+  <tbody>{% for batch, s in sheets %}
+    <tr><td>{{ batch.from_class.name }}</td><td>{{ batch.prepared_by }}<div class="muted small">{{ batch.submitted_at|date:"j M H:i" }}</div></td>
+      <td class="small">{% for d, c, n in s.lines %}{{ n }} {{ d }}{% if c %} → {{ c }}{% endif %}{% if not forloop.last %}, {% endif %}{% endfor %}</td>
+      <td><a class="btn small" href="{% url 'promotion_review' batch.pk %}">Review</a></td></tr>
+  {% empty %}<tr><td colspan="4" class="muted">No sheets waiting.</td></tr>{% endfor %}</tbody>
+</table></div>
+
+<h2>Transfer requests</h2>
+<div class="table-wrap card flush"><table>
+  <thead><tr><th>Learner</th><th>Move</th><th>Reason</th><th>Requested by</th><th></th></tr></thead>
+  <tbody>{% for t in transfers %}
+    <tr><td><a href="{% url 'learner_profile' t.learner_id %}?tab=enrollments">{{ t.learner.full_name }}</a></td>
+      <td>{{ t.from_enrollment.class_group.name }} → <strong>{{ t.to_class.name }}</strong> from {{ t.effective_date|date:"j M Y" }}</td>
+      <td class="small">{{ t.note }}</td><td>{{ t.requested_by }}</td>
+      <td><form method="post" action="{% url 'transfer_decide' t.pk %}" class="inline-form">{% csrf_token %}
+        <input type="text" name="note" placeholder="Note (needed to reject)" aria-label="Decision note">
+        <button class="btn small" name="action" value="approve">Approve</button>
+        <button class="btn small danger" name="action" value="reject">Reject</button></form></td></tr>
+  {% empty %}<tr><td colspan="5" class="muted">No transfers waiting.</td></tr>{% endfor %}</tbody>
+</table></div>
+
+<h2>Held for review</h2>
+<div class="table-wrap card flush"><table>
+  <thead><tr><th>Learner</th><th>From</th><th>Why held</th><th></th></tr></thead>
+  <tbody>{% for r in held %}
+    <tr><td>{{ r.learner.full_name }}</td><td>{{ r.batch.from_class.name }}</td><td class="small">{{ r.note }}</td>
+      <td><a class="btn small secondary" href="{% url 'promotion_place' r.pk %}">Decide</a></td></tr>
+  {% empty %}<tr><td colspan="4" class="muted">Nobody is held.</td></tr>{% endfor %}</tbody>
+</table></div>
+{% endblock %}

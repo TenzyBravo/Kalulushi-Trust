@@ -80,7 +80,7 @@
 
 {% elif tab == "enrollments" %}
 <div class="actions">
-  {% if current and perms.learners.transfer_learner %}<a class="btn" href="{% url 'learner_transfer' learner.pk %}">Transfer to another class</a>{% endif %}
+  {% if current and perms.learners.request_transfer %}<a class="btn" href="{% url 'learner_transfer' learner.pk %}">Request a transfer</a>{% endif %}
   {% if not current and perms.learners.add_enrollment %}<a class="btn" href="{% url 'learner_enroll' learner.pk %}">Enrol in a class</a>{% endif %}
 </div>
 <div class="table-wrap"><table>
@@ -94,6 +94,23 @@
       <td>{% if e.status != "reversed" and perms.learners.change_enrollment %}<a class="small" href="{% url 'learner_enrollment_reverse' learner.pk e.pk %}">reverse</a>{% endif %}</td>
     </tr>{% empty %}<tr><td colspan="8" class="muted">No enrolments.</td></tr>{% endfor %}</tbody>
 </table></div>
+
+{% if requests %}
+<h2>Promotion and transfer requests</h2>
+<div class="table-wrap card flush"><table>
+  <thead><tr><th>Requested</th><th>What</th><th>Status</th><th>Decided</th><th></th></tr></thead>
+  <tbody>{% for r in requests %}
+    <tr><td>{{ r.created_at|date:"j M Y" }}<div class="muted small">{{ r.requested_by }}</div></td>
+      <td>{% if r.kind == "transfer" %}Transfer {{ r.from_enrollment.class_group.name }} → {{ r.to_class.name }} from {{ r.effective_date|date:"j M" }}
+          {% else %}{{ r.get_decision_display }}{% if r.to_class %} → {{ r.to_class.name }}{% endif %} ({{ r.effective_date|date:"Y" }}){% endif %}
+          {% if r.note %}<div class="small muted">{{ r.note }}</div>{% endif %}</td>
+      <td><span class="tag{% if r.status == 'approved' %} ok{% elif r.status == 'pending' %} warn{% elif r.status == 'rejected' %} bad{% endif %}">{{ r.status }}</span></td>
+      <td class="small">{% if r.decided_by %}{{ r.decided_by }}, {{ r.decided_at|date:"j M" }}{% if r.decision_note %}: {{ r.decision_note }}{% endif %}{% endif %}</td>
+      <td>{% if r.status == "pending" and r.kind == "transfer" and r.requested_by_id == user.pk %}
+        <form method="post" action="{% url 'transfer_decide' r.pk %}">{% csrf_token %}<input type="hidden" name="action" value="cancel"><button class="link">Cancel</button></form>{% endif %}</td></tr>
+  {% endfor %}</tbody>
+</table></div>
+{% endif %}
 
 {% elif tab == "attendance" %}
 <form method="get" class="inline-form" style="margin-bottom:1rem">
