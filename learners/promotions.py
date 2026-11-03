@@ -320,7 +320,7 @@ def request_transfer(actor, learner, to_class, effective_date, reason):
     audit.record("transfer_request.create", request, actor=actor, school=learner.school, reason=reason,
                  changes={"learner": learner.learner_number, "to": to_class.name, "effective": effective_date})
     if can_approve(actor):
-        approve_transfer(actor, request, "Requested by the Headteacher")
+        return approve_transfer(actor, request, "Requested by the Headteacher")
     return request
 
 
