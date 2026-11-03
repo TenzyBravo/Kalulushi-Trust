@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Upload the school calendar{% endblock %}
+{% block content %}
+<p class="muted"><a href="{% url 'attendance_calendar' %}">Calendar</a></p>
+<p class="section-eyebrow">School days</p>
+<h1 class="section-title">Upload the school calendar</h1>
+<p class="section-intro">One file sets the year's terms, public holidays, no-learner days, no-alert days (e.g. parent-teacher conferences)
+and events. Every row is checked first; nothing is saved until you confirm. Uploading the same year again replaces the earlier upload;
+items added by hand on the Calendar screen stay.</p>
+<div class="actions"><a class="btn secondary" href="{% url 'attendance_calendar_template' %}">{% include "icons.html" with name="upload" %} Download the template</a></div>
+
+{% if not preview %}
+<form method="post" enctype="multipart/form-data" class="card">{% csrf_token %}
+  {% include "includes/fields.html" %}
+  <div class="actions"><button class="btn" type="submit">Check the file</button></div>
+</form>
+{% else %}
+
+{% if preview.errors %}
+<div class="danger-zone"><strong>{{ preview.errors|length }} row{{ preview.errors|length|pluralize }} need fixing.</strong> Nothing has been saved. Correct the file and upload it again.</div>
+{% else %}
+<div class="notice">The file is valid for <strong>{{ preview.year }}</strong>. Check what will change, then confirm.</div>
+{% endif %}
+
+<div class="grid">
+  <div class="card">
+    <h2 style="margin-top:0">Terms</h2>
+    {% for number, old, new in preview.term_changes %}
+      <div>Term {{ number }}: {% if old %}<span class="muted">{{ old.0|date:"j M" }} – {{ old.1|date:"j M" }}</span> → {% endif %}<strong>{{ new.0|date:"D j M" }} – {{ new.1|date:"D j M Y" }}</strong>{% if not old %} <span class="tag ok">new</span>{% endif %}</div>
+    {% empty %}<p class="muted">No term dates change.</p>{% endfor %}
+  </div>
+  <div class="card">
+    <h2 style="margin-top:0">Calendar items</h2>
+    {% for label, n in preview.counts.items %}<div><strong>{{ n }}</strong> {{ label|lower }}</div>{% empty %}<p class="muted">None.</p>{% endfor %}
+    {% if preview.replaced %}<p class="small muted">Replaces {{ preview.replaced }} item{{ preview.replaced|pluralize }} from an earlier upload or the automatic holidays. Hand-added items stay.</p>{% endif %}
+  </div>
+</div>
+
+<div class="table-wrap card flush"><table>
+  <thead><tr><th>Line</th><th>Type</th><th>Name</th><th>Dates</th><th>Applies to</th><th>Check</th></tr></thead>
+  <tbody>{% for r in preview.rows %}
+    <tr{% if r.errors %} class="row-flag"{% endif %}>
+      <td>{{ r.line }}</td><td><span class="tag{% if r.kind == 'closure' or r.kind == 'holiday' %} warn{% elif r.kind == 'term' %} ok{% endif %}">{{ r.label|default:"?" }}</span></td>
+      <td>{{ r.name }}{% if r.notes %}<div class="small muted">{{ r.notes }}</div>{% endif %}</td>
+      <td>{{ r.start|date:"D j M Y"|default:"—" }}{% if r.end and r.end != r.start %} – {{ r.end|date:"D j M Y" }}{% endif %}</td>
+      <td>{{ r.scope }}</td>
+      <td class="small">{% for e in r.errors %}<div class="errorlist">✗ {{ e }}</div>{% endfor %}{% for w in r.warnings %}<div class="muted">ⓘ {{ w }}</div>{% endfor %}</td>
+    </tr>
+  {% endfor %}</tbody>
+</table></div>
+
+<div class="actions">
+  {% if not preview.errors %}
+  <form method="post">{% csrf_token %}<input type="hidden" name="action" value="confirm"><button class="btn" type="submit">Confirm and save the calendar</button></form>
+  {% endif %}
+  <a href="{% url 'attendance_calendar_upload' %}">Upload a different file</a>
+</div>
+{% endif %}
+{% endblock %}

@@ -99,13 +99,16 @@ class Command(BaseCommand):
             self.stdout.write("No academic year or administrator yet; public holidays not added.")
             return
         for academic_year in years:
+            if CalendarEvent.objects.filter(academic_year=academic_year, source="upload", superseded_at__isnull=True).exists():
+                self.stdout.write(f"{academic_year} has an uploaded calendar; its holidays come from there.")
+                continue
             added = 0
             for name, day in zambian_holidays(academic_year.start_date.year):
                 if not academic_year.contains(day):
                     continue
                 _, created = CalendarEvent.objects.get_or_create(
                     school=school, academic_year=academic_year, kind=CalendarEvent.HOLIDAY, name=name, start_date=day,
-                    defaults={"end_date": day, "created_by": actor},
+                    defaults={"end_date": day, "created_by": actor, "source": "seed"},
                 )
                 added += created
             if added:

@@ -27,7 +27,7 @@ class SchoolCalendar:
         )
         lo = min([start] + [t.start_date for t in self.terms])
         self.events = list(
-            CalendarEvent.objects.filter(school=school, start_date__lte=end)
+            CalendarEvent.objects.filter(school=school, start_date__lte=end, superseded_at__isnull=True)
             .filter(Q(end_date__isnull=True) | Q(end_date__gte=lo))
             .select_related("grade", "class_group")
         )
@@ -76,6 +76,11 @@ class SchoolCalendar:
 
     def is_register_day(self, day, class_group):
         return self.is_school_day(day) and self.closure_for(class_group, day) is None
+
+    def no_alert_day(self, day):
+        """A day when registers are taken but absences never start or extend a case (e.g. parent-teacher days)."""
+        found = self._covering(day, CalendarEvent.NO_ALERT_DAY)
+        return found[0] if found else None
 
     def school_days_between(self, after, until):
         """School days d with after < d <= until."""

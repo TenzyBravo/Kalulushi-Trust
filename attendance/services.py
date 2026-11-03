@@ -136,7 +136,8 @@ def _run_records(learner, day):
         AttendanceRecord.objects.filter(learner=learner, session__date__range=(day - RUN_WINDOW, day + RUN_WINDOW))
         .select_related("session", "class_group").order_by("session__date")
     )
-    return [r for r in records if cal.is_register_day(r.session.date, r.class_group)]
+    # No-alert days (e.g. parent-teacher conferences) neither extend nor break a run, like days with no register.
+    return [r for r in records if cal.is_register_day(r.session.date, r.class_group) and not cal.no_alert_day(r.session.date)]
 
 
 def check_absence_run(record, actor=None):

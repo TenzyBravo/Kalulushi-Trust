@@ -8,7 +8,9 @@ from core.models import School
 from learners.models import Enrollment, Guardian, Learner
 from school.models import AcademicYear, ClassGroup, Grade
 
-EVENT_KINDS = ["holiday", "closure", "extra_school_day"]
+# no_alert_day: registers are taken but absences never start or extend a case; event: shown only.
+EVENT_KINDS = ["holiday", "closure", "extra_school_day", "no_alert_day", "event"]
+EVENT_SOURCES = ["manual", "upload", "seed"]
 STATUSES = ["present", "absent", "late", "excused"]
 CASE_STATUSES = ["new", "follow_up_pending", "in_progress", "resolved", "escalated"]
 ACTION_KINDS = ["contact", "note", "status_change", "referral", "system_note"]
@@ -19,7 +21,7 @@ REASON_CATEGORIES = ["illness", "family", "transport", "fees", "work", "unknown"
 class CalendarEvent(models.Model):
     """Exceptions to term time. A closure can apply to the whole school, one grade or one class (§3, §3.1)."""
 
-    HOLIDAY, CLOSURE, EXTRA_SCHOOL_DAY = EVENT_KINDS
+    HOLIDAY, CLOSURE, EXTRA_SCHOOL_DAY, NO_ALERT_DAY, EVENT = EVENT_KINDS
 
     school = models.ForeignKey(School, on_delete=models.PROTECT)
     academic_year = models.ForeignKey(AcademicYear, on_delete=models.PROTECT, related_name="calendar_events")
@@ -30,6 +32,9 @@ class CalendarEvent(models.Model):
     grade = models.ForeignKey(Grade, on_delete=models.PROTECT, null=True, blank=True, related_name="+")
     class_group = models.ForeignKey(ClassGroup, on_delete=models.PROTECT, null=True, blank=True, related_name="+", db_column="class_id")
     reason = models.TextField(blank=True)
+    source = models.TextField(choices=choices(*EVENT_SOURCES), default="manual",
+                              help_text="Uploaded items are replaced when the year's calendar is uploaded again.")
+    superseded_at = models.DateTimeField(null=True, blank=True, help_text="Set when a later upload replaced it; kept for history.")
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -57,7 +62,10 @@ class CalendarEvent(models.Model):
             models.CheckConstraint(
                 condition=~Q(kind="closure") | ~Q(reason=""), name="calendar_events_closure_reason"
             ),
+            status_check("calendar_events_source_valid", "source", EVENT_SOURCES),
         ]
+        indexes = [models.Index(fields=["academic_year", "start_date"], condition=Q(superseded_at__isnull=True),
+                                name="calendar_events_in_force")]
 
     def __str__(self):
         return f"{self.name} ({self.start_date}{'' if self.end_date == self.start_date else f' to {self.end_date or 'end of term'}'})"
