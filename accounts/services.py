@@ -139,3 +139,50 @@ def reactivate(actor, user, reason):
     user.save(update_fields=["is_active", "deactivated_at", "deactivated_by", "updated_at"])
     audit.record("user.reactivate", user, actor=actor, reason=reason, changes={"is_active": [False, True]})
     return user
+
+
+def _check_grant(actor, user, code):
+    from .permission_catalogue import GRANTABLE
+
+    if code not in GRANTABLE:
+        raise ValidationError("This permission comes only with a role.")
+    if not actor.has_perm("accounts.manage_staff") or not roles.can_manage(actor, user):
+        raise PermissionDenied("You may not change this account's permissions.")
+    if not actor.has_perm(code):
+        raise PermissionDenied("You can only give a permission you hold yourself.")
+
+
+def role_grants(user, code):
+    app_label, codename = code.split(".", 1)
+    return user.groups.filter(permissions__content_type__app_label=app_label, permissions__codename=codename).exists()
+
+
+@transaction.atomic
+def grant_permission(actor, user, code, reason):
+    """Give one person a permission on top of their roles, e.g. support notes for a teacher."""
+    from .permission_catalogue import get_permission
+
+    _check_grant(actor, user, code)
+    if not reason.strip():
+        raise ValidationError("Give a reason for granting this permission.")
+    if role_grants(user, code):
+        raise ValidationError(f"{user} already has this through their role.")
+    permission = get_permission(code)
+    if user.user_permissions.filter(pk=permission.pk).exists():
+        return user
+    user.user_permissions.add(permission)
+    audit.record("user.permission_grant", user, actor=actor, reason=reason, changes={"permission": [None, code]})
+    return user
+
+
+@transaction.atomic
+def revoke_permission(actor, user, code, reason=""):
+    from .permission_catalogue import get_permission
+
+    _check_grant(actor, user, code)
+    permission = get_permission(code)
+    if not user.user_permissions.filter(pk=permission.pk).exists():
+        return user
+    user.user_permissions.remove(permission)
+    audit.record("user.permission_revoke", user, actor=actor, reason=reason, changes={"permission": [code, None]})
+    return user

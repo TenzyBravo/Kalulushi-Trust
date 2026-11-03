@@ -32,6 +32,15 @@ class SchoolSettings(models.Model):
     sms_sender_name = models.TextField(blank=True, help_text="Up to 11 characters, shown as the SMS sender.")
     motto = models.TextField(blank=True)
     logo = models.FileField(upload_to="logos/", blank=True)
+    attendance_edit_days = models.SmallIntegerField(
+        default=2, help_text="School days after a register's date during which the class teacher may still edit it."
+    )
+    attendance_backfill_days = models.SmallIntegerField(
+        default=5, help_text="How many school days back a class teacher may take a missed register."
+    )
+    absence_stale_days = models.SmallIntegerField(
+        default=5, help_text="An open absence case with no action for this many school days is highlighted."
+    )
 
     class Meta:
         db_table = "school_settings"
@@ -39,8 +48,17 @@ class SchoolSettings(models.Model):
         constraints = [
             models.CheckConstraint(
                 condition=Q(sms_sender_name__regex=r"^.{0,11}$"), name="school_settings_sender_max_11"
-            )
+            ),
+            models.CheckConstraint(
+                condition=Q(attendance_edit_days__gte=0, attendance_backfill_days__gte=0, absence_stale_days__gte=1),
+                name="school_settings_attendance_days_valid",
+            ),
         ]
+
+    @classmethod
+    def for_school(cls, school):
+        """The school's settings, or unsaved defaults if the row is missing."""
+        return cls.objects.filter(school=school).first() or cls(school=school)
 
     def __str__(self):
         return f"Settings for {self.school}"

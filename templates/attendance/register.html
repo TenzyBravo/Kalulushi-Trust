@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block title %}{{ class_group.name }} register · {{ day|date:"j M Y" }}{% endblock %}
+{% block content %}
+<div class="register">
+  <div class="register-head">
+    <div>
+      <p class="section-eyebrow">Class register</p>
+      <h1 class="section-title">{{ class_group.name }} — {{ class_group.grade.name }} ({{ class_group.academic_year }})</h1>
+    </div>
+    <div class="muted">{{ day|date:"D, j M Y" }}</div>
+  </div>
+
+  <div class="register-tools">
+    <form method="get" class="inline-form">
+      <label for="date">Register date</label>
+      <input type="date" id="date" name="date" value="{{ day|date:'Y-m-d' }}" max="{{ today|date:'Y-m-d' }}" onchange="this.form.submit()">
+    </form>
+    {% if perms.learners.change_enrollment %}<a class="register-link" href="{% url 'learner_list' %}?class={{ class_group.pk }}">{% include "icons.html" with name="people" %} Edit roster</a>{% endif %}
+  </div>
+
+  {% if session %}
+  <p class="muted small">Taken by {{ session.taken_by }} · last saved {{ session.updated_at|date:"j M H:i" }} by {{ session.last_saved_by }}</p>
+  {% endif %}
+
+  {% if blocked %}
+    <div class="notice">{{ blocked }}</div>
+  {% elif not rows %}
+    <div class="notice">No learners are enrolled in {{ class_group.name }} on this date.</div>
+  {% elif mode == "view" %}
+    <div class="notice">{% if session %}You can view this register.{% else %}No register was taken on this date.{% endif %}
+      Only the class teacher takes the register{% if session %}; changes after {{ class_group.school.settings.attendance_edit_days|default:2 }} school days are corrections by the office{% endif %}.</div>
+  {% elif mode == "correct" %}
+    <div class="danger-zone">You are <strong>correcting</strong> this register. Give a reason below; every change is recorded in the audit log.</div>
+  {% endif %}
+
+  {% if errors %}<div class="danger-zone"><ul class="errorlist">{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul></div>{% endif %}
+
+  {% if rows and not blocked %}
+  <form method="post" id="register-form">
+    {% csrf_token %}
+    <input type="hidden" name="date" value="{{ day|date:'Y-m-d' }}">
+
+    <div class="register-filter">
+      <input type="search" id="register-search" placeholder="Search by name or learner number" aria-label="Search learners">
+      <select id="register-status" aria-label="Show">
+        <option value="">Everyone</option><option value="unmarked">Not yet marked</option>
+        {% for value, letter, label in statuses %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+      </select>
+      <span class="register-counts" id="register-counts">
+        {% for value, letter, label in statuses %}<span class="att-tag {{ value }}">{{ letter }} <b data-count="{{ value }}">0</b></span>{% endfor %}
+        <span class="muted small" id="unmarked-count"></span>
+      </span>
+    </div>
+
+    {% for row, status, note in rows %}
+    <div class="register-row" data-name="{{ row.learner.full_name|lower }} {{ row.learner.learner_number|lower }}" data-status="{{ status|default:'unmarked' }}">
+      <div class="register-row-head">
+        <span class="register-name">{{ row.learner.full_name }}</span>
+        <span class="register-number">{{ row.learner.learner_number }}</span>
+      </div>
+      <div class="seg" role="radiogroup" aria-label="Attendance for {{ row.learner.full_name }}">
+        {% for value, letter, label in statuses %}
+        <label class="seg-{{ value }}" title="{{ label }}">
+          <input type="radio" name="status_{{ row.learner.pk }}" value="{{ value }}"{% if status == value %} checked{% endif %}{% if not editable %} disabled{% endif %}>
+          <span>{{ letter }}<span class="seg-word"> {{ label }}</span></span>{# the word is for screen readers and the tooltip #}
+        </label>
+        {% endfor %}
+      </div>
+      {% if editable %}
+      <details class="register-note"{% if note %} open{% endif %}>
+        <summary>{% include "icons.html" with name="plus" %} {% if note %}Note{% else %}Add note{% endif %}</summary>
+        <input type="text" name="note_{{ row.learner.pk }}" value="{{ note }}" maxlength="300" placeholder="e.g. arrived 08:40, sent home sick">
+      </details>
+      {% elif note %}<p class="muted small">Note: {{ note }}</p>{% endif %}
+    </div>
+    {% endfor %}
+
+    {% if editable %}
+      {% if mode == "correct" %}
+      <div class="card"><label for="reason">Reason for the correction</label>
+        <textarea id="reason" name="reason" rows="2" required>{{ reason }}</textarea></div>
+      {% endif %}
+      <div class="register-spacer"></div>
+      <div class="register-bar">
+        <button type="button" class="register-bar-btn" id="mark-all">✓ Mark all present</button>
+        <a class="register-bar-btn" href="{{ back }}">Cancel</a>
+        <button type="submit" class="btn register-save">{% include "icons.html" with name="upload" %} Save changes</button>
+      </div>
+    {% endif %}
+  </form>
+  {% endif %}
+</div>
+
+<script>
+(function () {
+  var form = document.getElementById("register-form");
+  if (!form) return;
+  var rows = Array.prototype.slice.call(form.querySelectorAll(".register-row"));
+  var search = document.getElementById("register-search");
+  var filter = document.getElementById("register-status");
+
+  function refresh() {
+    var counts = {present: 0, absent: 0, late: 0, excused: 0}, unmarked = 0;
+    var q = (search.value || "").trim().toLowerCase(), f = filter.value;
+    rows.forEach(function (row) {
+      var checked = row.querySelector("input[type=radio]:checked");
+      var status = checked ? checked.value : "unmarked";
+      row.dataset.status = status;
+      if (checked) counts[status] += 1; else unmarked += 1;
+      var show = (!q || row.dataset.name.indexOf(q) !== -1) && (!f || f === status);
+      row.style.display = show ? "" : "none";
+    });
+    Object.keys(counts).forEach(function (k) {
+      var el = form.querySelector("[data-count=" + k + "]");
+      if (el) el.textContent = counts[k];
+    });
+    document.getElementById("unmarked-count").textContent = unmarked ? unmarked + " not yet marked" : "everyone marked";
+  }
+
+  var markAll = document.getElementById("mark-all");
+  if (markAll) markAll.addEventListener("click", function () {
+    rows.forEach(function (row) {
+      if (!row.querySelector("input[type=radio]:checked")) {
+        var present = row.querySelector("input[value=present]");
+        if (present) present.checked = true;
+      }
+    });
+    refresh();
+  });
+  form.addEventListener("change", refresh);
+  search.addEventListener("input", refresh);
+  filter.addEventListener("change", refresh);
+  refresh();
+})();
+</script>
+{% endblock %}
