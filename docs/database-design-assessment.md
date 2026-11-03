@@ -1,7 +1,7 @@
 # Database Design — Slice 3: Curriculum, Assessments and Competencies
 
-**Status:** Draft for review — decisions B1–B8 need answers\
-**Version:** 0.1\
+**Status:** Approved 3 November 2026 — B1, B3–B8 decided; B2 (weights) on hold and entered later by the school\
+**Version:** 1.0\
 **Date:** 3 November 2026\
 **Implements:** Requirements baseline v1.1, §2 (curriculum, versioning), §7 (assessment entry, drafts and
 submission, missing assessments, competency assessment), §8 (grading, calculations, optional rankings),
@@ -54,7 +54,7 @@ Versioned: an active scheme is never edited; a change is a new version (baseline
 | `stage_id` | FK → `education_stages` | Primary and Secondary have separate schemes (never compared, §2) |
 | `name` | text | e.g. `Secondary percentage grades` |
 | `version` | smallint | `UNIQUE (school_id, stage_id, name, version)` |
-| `effective_from_year_id` | FK → `academic_years` | first year it may be used |
+| `effective_from_year_id` | FK → `academic_years`, null | first year it may be used; null means from the start |
 | `status` | text | `draft` \| `active` \| `retired` |
 | `decimal_places` | smallint | rounding of percentages, `CHECK (decimal_places BETWEEN 0 AND 2)`; half-up |
 | `missing_rule` | text | `block` \| `exclude_excused` (decision B4) |
@@ -95,7 +95,7 @@ Which components, weights and grading scheme apply to a grade (or a whole stage)
 | `stage_id` | FK | the stage it covers … |
 | `grade_id` | FK, null | … or only this grade, which then overrides the stage plan |
 | `grading_scheme_id` | FK | must be `active` and for the same stage |
-| `status` | text | `draft` \| `active` \| `locked` (locked once any assessment under it is submitted) |
+| `status` | text | `draft` \| `active`. A draft plan's components and weights can change; an active plan cannot. Activation needs an active scheme and weights adding up to 100 |
 | | | one plan per stage or grade per term: `UNIQUE (term_id, stage_id) WHERE grade_id IS NULL`, `UNIQUE (term_id, grade_id) WHERE grade_id IS NOT NULL` |
 
 ### `assessment_components`
@@ -104,8 +104,7 @@ Which components, weights and grading scheme apply to a grade (or a whole stage)
 |---|---|---|
 | `plan_id` | FK | |
 | `name` | text | e.g. `Continuous assessment`, `End-of-term exam` |
-| `assessment_type_ids` | | which types count towards it (link table) |
-| `weight` | numeric(5,2) | `CHECK (weight > 0 AND weight <= 100)` |
+| `weight` | numeric(5,2), null | `CHECK (weight IS NULL OR weight > 0 AND weight <= 100)`; may stay empty while the plan is a draft (decision B2) |
 | `required` | boolean | a required component missing blocks the subject score |
 | `sequence` | smallint | |
 | | | weights of a plan add up to 100: checked when the plan is activated |
@@ -150,7 +149,7 @@ One assessment of one class subject, e.g. "5A Mathematics — Test 1".
 
 **Submission** (one action for the whole class): refused unless every learner enrolled in the class on
 the assessment date has a row with a score or a missing status. Then the assessment becomes
-`submitted` and its plan `locked`. Draft saves are frequent and not individually audited; the
+`submitted`. Teachers can create assessments and submit marks while the plan is still a draft; only the calculation waits for an active plan. Draft saves are frequent and not individually audited; the
 submission is.
 
 ### `assessment_result_history`
@@ -202,8 +201,8 @@ change (trigger).
 
 ### `competencies`
 
-`framework_id`, `code`, `name`, `description`, `sequence`, and `subject_id` (null for a cross-cutting
-competency; set if the competency belongs to one subject, decision B6). `UNIQUE (framework_id, code)`.
+`framework_id`, `code`, `name`, `description`, `sequence`. Competencies are cross-cutting: one set per
+class, recorded by the class teacher (decision B6). `UNIQUE (framework_id, code)`.
 
 ### `competency_levels`
 
@@ -212,9 +211,9 @@ competency; set if the competency belongs to one subject, decision B6). `UNIQUE 
 
 ### `competency_sheets`
 
-The end-of-term sheet for one class (or class subject, decision B6) and term: `class_group_id`,
-`class_subject_id` (null for cross-cutting), `term_id`, `framework_id`, `status` (`draft` \| `submitted`),
-`submitted_by`, `submitted_at`. `UNIQUE (class_group_id, term_id, class_subject_id)`.
+The end-of-term sheet for one class and term: `class_group_id`, `term_id`, `framework_id`, `status`
+(`draft` \| `submitted`), `submitted_by`, `submitted_at`. `UNIQUE (class_group_id, term_id)`, and
+`UNIQUE (id, class_group_id)` as the target of the results' composite key.
 
 ### `learner_competency_results`
 
@@ -239,8 +238,8 @@ the "incomplete" list and before report-card approval (§7).
 | Grading schemes, competency frameworks, plans, assessment types | manage | view | manage | view |
 | Create assessments and enter marks | — | — | — | own class subjects, or cover with `assessment_entry` |
 | Submit a class's marks | — | — | — | same |
-| Correct submitted marks, with a reason | yes | yes | yes | own class subjects (B8) |
-| Record competencies | — | — | — | per B6, or cover with `competency_entry` |
+| Correct submitted marks or competencies, with a reason | yes | yes | yes | own class subjects or class (B8) |
+| Record competencies | — | — | — | class teacher of the class (B6) |
 | View results | all | all | all | classes they teach |
 | Missing / incomplete assessments list | all | all | all | their own |
 | Turn rankings on or off | yes | — | — | — |
@@ -269,18 +268,17 @@ with the matching duty. A backup assignment grants nothing by itself.
 
 | # | Question | Recommendation |
 |---|---|---|
-| B1 | **Grade bands.** What grades does each stage use? | Start both stages on a percentage scheme the school can edit: **Distinction 75–100, Merit 60–74, Credit 50–59, Pass 40–49, Fail 0–39**, 0 decimal places. If the school uses ECZ points (1–9) or its own bands for Forms 1–4, give them and we load those instead. |
-| B2 | **Term weighting.** How do continuous assessment and the end-of-term exam combine? | **Continuous assessment 40%, end-of-term exam 60%**, both required, set per stage and changeable per grade and term. |
-| B3 | Several assessments in one component (Test 1, Test 2): how do they combine? | **Average of their percentages**, so a test out of 20 and one out of 50 count equally. The alternative is total marks ÷ total possible. |
-| B4 | **Missing results.** When does a missing mark block the subject score? | **Absent and Not Yet Assessed block it; Excused is left out** if the component has another result. Nothing is ever counted as zero. The Headteacher's exception on a report card comes in slice 4. |
-| B5 | **Overall term score.** | **Average of the learner's subject scores**, only when every subject has a score; otherwise pending. |
-| B6 | **Competencies.** Are they cross-cutting (one set per class, recorded by the class teacher) or per subject (recorded by each subject teacher)? And what are the official level labels? | **Cross-cutting, recorded by the class teacher**, with the national curriculum's competencies and **four levels** loaded as a framework the school can edit. Please send the official competency list and level labels the school uses. |
-| B7 | Who creates assessments? | **The subject teacher**, under the components the Academic Administrator has set; the office can view them all. |
-| B8 | How long may a teacher correct submitted marks? | **Until the report card is approved** (slice 4), always with a reason and audited; after that, through the report-card revision workflow. |
+| B1 | Grade bands | **Agreed:** Distinction 75–100, Merit 60–74, Credit 50–59, Pass 40–49, Fail 0–39, 0 decimal places, loaded as version 1 for both stages; the school can make new versions. |
+| B2 | Term weighting | **On hold.** No default weights: the Academic Administrator enters them in each term's plan. A plan cannot be activated until its weights add up to 100, and until then subject scores show as pending ("weights not set"). Marks can still be entered and submitted. |
+| B3 | Several assessments in one component | **Agreed:** average of their percentages. |
+| B4 | Missing results | **Agreed:** Absent and Not Yet Assessed block the subject score; Excused is left out if the component has another result; never zero. |
+| B5 | Overall term score | **Agreed:** average of the subject scores, only when every subject has one. |
+| B6 | Competencies | **Agreed:** cross-cutting, one sheet per class, recorded by the class teacher. **No default list or levels:** the Academic Administrator enters the official framework when the school confirms it. |
+| B7 | Who creates assessments | **Agreed:** the subject teacher (or cover with `assessment_entry`), under the plan's components. |
+| B8 | Correcting submitted marks | **Agreed:** until the report card is approved (slice 4), always with a reason and audited. |
 
 ## 11. Next steps
 
-1. Answer B1–B8, and send the competency list and level labels for B6.
-2. Build slice 3: migrations and triggers, setup screens, mark entry with auto-save, competency entry,
+1. Build slice 3: migrations and triggers, setup screens, mark entry with auto-save, competency entry,
    calculations, missing-assessment list, profile tabs, tests for every database rule and calculation.
-3. Design slice 4 (report cards) while slice 3 is built.
+2. Design slice 4 (report cards) while slice 3 is built.
