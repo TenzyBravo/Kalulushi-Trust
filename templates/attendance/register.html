@@ -33,6 +33,7 @@
     <div class="danger-zone">You are <strong>correcting</strong> this register. Give a reason below; every change is recorded in the audit log.</div>
   {% endif %}
 
+  {% if no_alert %}<div class="notice">{{ no_alert.name }}: take the register as usual, but absences today will not start an absence case.</div>{% endif %}
   {% if errors %}<div class="danger-zone"><ul class="errorlist">{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul></div>{% endif %}
 
   {% if rows and not blocked %}

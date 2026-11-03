@@ -9,4 +9,6 @@ urlpatterns = [
     path("follow-up/<int:pk>/", views.case_detail, name="attendance_case"),
     path("calendar/", views.calendar, name="attendance_calendar"),
     path("calendar/<int:pk>/end/", views.calendar_end, name="attendance_calendar_end"),
+    path("calendar/upload/", views.calendar_upload, name="attendance_calendar_upload"),
+    path("calendar/template.xlsx", views.calendar_template, name="attendance_calendar_template"),
 ]

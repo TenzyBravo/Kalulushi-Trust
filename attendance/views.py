@@ -4,7 +4,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required, permission_required
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db.models import Count, Max, Q
-from django.http import Http404
+from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -14,9 +14,9 @@ from learners.models import Guardian
 from school.models import AcademicYear, ClassGroup
 from staffing.access import sees_whole_school
 
-from . import access, services
+from . import access, calendar_import, services
 from .calendar import for_days
-from .forms import ClosureForm, ContactForm, EndEventForm, EventForm, NoteForm, StatusForm
+from .forms import CalendarUploadForm, ClosureForm, ContactForm, EndEventForm, EventForm, NoteForm, StatusForm
 from .models import STATUSES, AbsenceCase, AttendanceSession, CalendarEvent
 
 
@@ -111,9 +111,10 @@ def register(request, pk):
             return redirect(_register_url(class_group, day))
 
     counts = {s: sum(1 for st, _ in marks.values() if st == s) for s in STATUSES}
+    no_alert = for_days(day, day, class_group.school).no_alert_day(day) if not blocked else None
     return render(request, "attendance/register.html", {
         "class_group": class_group, "day": day, "today": today_, "session": session, "mode": mode,
-        "editable": editable, "blocked": blocked, "errors": errors, "reason": reason,
+        "editable": editable, "blocked": blocked, "errors": errors, "reason": reason, "no_alert": no_alert,
         "rows": [(row, marks[row.learner.pk][0], marks[row.learner.pk][1]) for row in rows],
         "statuses": [(s, s[0].upper(), s.capitalize()) for s in STATUSES], "counts": counts,
         "unmarked": sum(1 for st, _ in marks.values() if st not in STATUSES),
@@ -245,7 +246,8 @@ def calendar(request):
             else:
                 messages.success(request, "Added to the calendar.")
                 return redirect(reverse("attendance_calendar") + (f"?year={year.pk}" if year else ""))
-    events = CalendarEvent.objects.filter(academic_year=year).select_related("grade", "class_group", "created_by") if year else []
+    events = CalendarEvent.objects.filter(academic_year=year, superseded_at__isnull=True).select_related(
+        "grade", "class_group", "created_by") if year else []
     return render(request, "attendance/calendar.html", {
         "year": year, "years": AcademicYear.objects.filter(school=user.school),
         "terms": year.terms.all() if year else [], "events": events, "add": add,
@@ -274,3 +276,55 @@ def calendar_end(request, pk):
         "form": form, "title": f"Change the end of {event.name}", "cancel": reverse("attendance_calendar"),
         "intro": f"{event.scope_label}, from {services.day_label(event.start_date)}. Registers from the day after the new end date can be taken again.",
     })
+
+
+# Calendar upload ------------------------------------------------------------------
+
+CALENDAR_SESSION_KEY = "calendar_upload"
+
+
+@login_required
+@permission_required("attendance.add_calendarevent", raise_exception=True)
+def calendar_template(request):
+    response = HttpResponse(
+        calendar_import.workbook(),
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    response["Content-Disposition"] = 'attachment; filename="school-calendar-template.xlsx"'
+    return response
+
+
+@login_required
+@permission_required("attendance.add_calendarevent", raise_exception=True)
+def calendar_upload(request):
+    """Upload the year's calendar: checked and previewed before anything is saved."""
+    years = AcademicYear.objects.filter(school=request.user.school)
+    current = AcademicYear.current(request.user.school)
+    form = CalendarUploadForm(request.POST or None, request.FILES or None, years=years,
+                              initial={"year": current.pk if current else None})
+    preview = None
+    if request.method == "POST" and request.POST.get("action") == "confirm":
+        stored = request.session.get(CALENDAR_SESSION_KEY)
+        year = years.filter(pk=(stored or {}).get("year")).first()
+        if not stored or year is None:
+            messages.error(request, "The upload expired. Choose the file again.")
+            return redirect("attendance_calendar_upload")
+        preview = calendar_import.from_session(stored["rows"], year)
+        try:
+            created, replaced = calendar_import.apply(preview, request.user)
+        except (ValidationError, PermissionDenied) as exc:
+            messages.error(request, " ".join(_messages(exc)))
+        else:
+            request.session.pop(CALENDAR_SESSION_KEY, None)
+            messages.success(request, f"Calendar for {year} uploaded: {created} item(s) added"
+                                      f"{f', {replaced} earlier item(s) replaced' if replaced else ''}.")
+            return redirect(f"{reverse('attendance_calendar')}?year={year.pk}")
+    elif request.method == "POST" and form.is_valid():
+        year = form.cleaned_data["year"]
+        try:
+            preview = calendar_import.parse(form.cleaned_data["file"], form.cleaned_data["file"].name, year)
+        except calendar_import.CalendarFileError as exc:
+            form.add_error("file", str(exc))
+        else:
+            request.session[CALENDAR_SESSION_KEY] = {"year": year.pk, "rows": [r.as_session() for r in preview.rows]}
+    return render(request, "attendance/calendar_upload.html", {"form": form, "preview": preview})

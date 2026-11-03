@@ -26,7 +26,8 @@ Closing a grade or class (for example after its final exams) stops its registers
 
 <div class="actions">
   {% if can_close %}<a class="btn" href="?year={{ year.pk }}&add=closure#add">Close a grade, class or the school</a>{% endif %}
-  {% if can_manage %}<a class="btn secondary" href="?year={{ year.pk }}&add=event#add">Add a holiday or extra school day</a>{% endif %}
+  {% if can_manage %}<a class="btn secondary" href="?year={{ year.pk }}&add=event#add">Add a holiday, event or extra day</a>
+  <a class="btn secondary" href="{% url 'attendance_calendar_upload' %}">{% include "icons.html" with name="upload" %} Upload the year's calendar</a>{% endif %}
 </div>
 
 {% if add == "closure" and can_close %}
@@ -37,24 +38,25 @@ Closing a grade or class (for example after its final exams) stops its registers
 </form>
 {% elif add == "event" and can_manage %}
 <form method="post" class="card" id="add">{% csrf_token %}<input type="hidden" name="add" value="event">
-  <h2 style="margin-top:0">Holiday or extra school day</h2>
+  <h2 style="margin-top:0">Holiday, event or extra day</h2>
   {% with form=event_form %}{% include "includes/fields.html" %}{% endwith %}
   <div class="actions"><button class="btn" type="submit">Add</button> <a href="?year={{ year.pk }}">Cancel</a></div>
 </form>
 {% endif %}
 
-<h2>Holidays, closures and extra days</h2>
+<h2>Holidays, closures, events and extra days</h2>
 <div class="table-wrap card flush"><table>
   <thead><tr><th>What</th><th>Applies to</th><th>From</th><th>To</th><th>Reason</th><th></th></tr></thead>
   <tbody>{% for e in events %}
     <tr>
-      <td><span class="tag{% if e.kind == 'closure' %} warn{% elif e.kind == 'extra_school_day' %} ok{% endif %}">{{ e.get_kind_display }}</span> {{ e.name }}</td>
+      <td><span class="tag{% if e.kind == 'closure' or e.kind == 'holiday' %} warn{% elif e.kind == 'extra_school_day' %} ok{% endif %}">{% if e.kind == "closure" %}No learners{% elif e.kind == "no_alert_day" %}No absence alerts{% else %}{{ e.get_kind_display }}{% endif %}</span> {{ e.name }}
+        {% if e.source == "upload" %}<span class="muted small">· uploaded</span>{% elif e.source == "seed" %}<span class="muted small">· automatic</span>{% endif %}</td>
       <td>{{ e.scope_label }}</td>
       <td>{{ e.start_date|date:"D j M" }}</td>
       <td>{% if e.end_date %}{{ e.end_date|date:"D j M" }}{% else %}end of term{% endif %}</td>
       <td class="small">{{ e.reason }}</td>
       <td>{% if e.kind == "closure" and can_close or e.kind != "closure" and can_manage %}<a class="small" href="{% url 'attendance_calendar_end' e.pk %}">change end</a>{% endif %}</td>
-    </tr>{% empty %}<tr><td colspan="6" class="muted">Nothing added yet. Run <code>manage.py seed_holidays</code> to add Zambia's public holidays.</td></tr>{% endfor %}</tbody>
+    </tr>{% empty %}<tr><td colspan="6" class="muted">Nothing added yet. Upload the year's calendar, or add items here.</td></tr>{% endfor %}</tbody>
 </table></div>
 {% endif %}
 {% endblock %}

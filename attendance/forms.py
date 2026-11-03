@@ -15,7 +15,12 @@ def _label(value):
 class EventForm(forms.Form):
     """A public holiday or an extra school day (school-wide)."""
 
-    kind = forms.ChoiceField(choices=[("holiday", "Public holiday"), ("extra_school_day", "Extra school day (e.g. Saturday catch-up)")])
+    kind = forms.ChoiceField(choices=[
+        ("holiday", "Public holiday"),
+        ("extra_school_day", "Extra school day (e.g. Saturday catch-up)"),
+        ("no_alert_day", "No absence alerts (registers taken, e.g. parent-teacher day)"),
+        ("event", "Event (shown on the calendar only)"),
+    ])
     name = forms.CharField(help_text="e.g. Heroes Day")
     start_date = forms.DateField(widget=DATE)
     end_date = forms.DateField(widget=DATE, required=False, help_text="Leave blank for a single day.")
@@ -89,3 +94,12 @@ class StatusForm(forms.Form):
         required=False, widget=forms.Textarea(attrs={"rows": 2}),
         help_text="Required when resolving (how it was resolved) or referring to the Headteacher (why).",
     )
+
+
+class CalendarUploadForm(forms.Form):
+    year = forms.ModelChoiceField(queryset=None, label="Academic year")
+    file = forms.FileField(help_text="The calendar template, filled in, as .xlsx or .csv.")
+
+    def __init__(self, *args, years=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["year"].queryset = years
