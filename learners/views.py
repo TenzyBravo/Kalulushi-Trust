@@ -180,6 +180,10 @@ def profile(request, pk):
         if ctx["can_see_notes"] and request.GET.get("notes") == "show":
             ctx["notes"] = services.view_support_notes(learner, user)  # audited
         ctx["note_count"] = learner.support_notes.filter(archived_at__isnull=True).count() if ctx["can_see_notes"] else None
+        # Guardians at a glance, primary contact first; full details are on the Guardians tab.
+        role_order = {"primary": 0, "alternative": 1}
+        links = sorted(learner.active_links(), key=lambda l: (role_order.get(l.contact_role, 2), l.created_at))
+        ctx["guardian_summary"] = [(l, l.guardian.current_contact()) for l in links]
     elif tab == "guardians":
         links = learner.guardian_links.select_related("guardian").order_by("status", "contact_role", "created_at")
         ctx["links"] = [(l, l.guardian.contacts.all()) for l in links]

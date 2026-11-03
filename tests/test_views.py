@@ -65,6 +65,13 @@ class ScreenTests(TestCase):
         self.assertNotIn("glance", response.context)
         self.assertEqual(response.context["learner_count"], 1)
 
+    def test_profile_shows_guardians_on_the_first_tab(self):
+        self.login(self.teacher)
+        response = self.client.get(f"/learners/{self.learner.pk}/")
+        self.assertContains(response, "Mary Mwansa")
+        self.assertContains(response, "+260971234567")
+        self.assertContains(response, "primary contact")
+
     def test_register_through_the_screen(self):
         self.login(self.head)
         data = {"first_name": "Bwalya", "last_name": "Zulu", "date_of_birth": "2018-05-05", "gender": "M",

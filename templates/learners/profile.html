@@ -19,6 +19,19 @@
   </dl>
   {% if perms.learners.change_learner %}<div class="actions"><a class="btn secondary small" href="{% url 'learner_edit' learner.pk %}">Edit details</a> <a class="btn secondary small" href="{% url 'learner_status' learner.pk %}">Change status</a></div>{% endif %}
 </div>
+<div class="card">
+  <h2 style="margin-top:0">Guardians</h2>
+  {% for link, contact in guardian_summary %}
+  <div style="margin-bottom:.5rem"><strong>{{ link.guardian.full_name }}</strong>
+    <span class="muted">· {{ link.relationship|default:"guardian" }}</span>
+    {% if link.contact_role != "none" %}<span class="tag ok">{{ link.contact_role }} contact</span>{% endif %}
+    <div>{% if contact %}{{ contact.phone }} {% if contact.is_verified %}<span class="tag ok">verified</span>{% else %}<span class="tag warn">not verified</span>{% endif %}{% else %}<span class="muted">no mobile number</span>{% endif %}
+      {% if link.guardian.email %}<span class="muted"> · {{ link.guardian.email }}</span>{% endif %}</div>
+  </div>
+  {% empty %}<p class="muted">No guardians linked yet.</p>{% endfor %}
+  <div class="actions"><a class="btn secondary small" href="?tab=guardians">All guardians and contacts</a>
+    {% if not guardian_summary and perms.learners.add_learnerguardian %}<a class="btn small" href="{% url 'learner_guardian_add' learner.pk %}">Add a guardian</a>{% endif %}</div>
+</div>
 {% if can_see_notes %}
 <div class="card">
   <h2 style="margin-top:0">Medical and support notes</h2>
