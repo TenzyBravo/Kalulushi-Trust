@@ -36,6 +36,9 @@ TYPE_OVERRIDES = {
     "assessment.enter_marks": "create",
     "assessment.record_competencies": "create",
     "assessment.correct_marks": "edit",
+    "learners.request_transfer": "create",
+    "learners.prepare_promotions": "create",
+    "learners.approve_enrollment_requests": "admin",
 }
 
 DESCRIPTIONS = {
@@ -44,7 +47,10 @@ DESCRIPTIONS = {
     "core.view_audit_log": "See every recorded change: who did what, when, and why.",
     "learners.view_support_notes": "Read a learner's medical and support notes. Every read is audited.",
     "learners.override_duplicate": "Save a learner despite a likely-duplicate warning, with a reason.",
-    "learners.transfer_learner": "Move a learner to another class within the year.",
+    "learners.transfer_learner": "Carry out a transfer once it is approved (used by the Headteacher).",
+    "learners.request_transfer": "Ask the Headteacher to move a learner they teach to another class.",
+    "learners.prepare_promotions": "Prepare a class's year-end promotion sheet (class teacher, or office).",
+    "learners.approve_enrollment_requests": "Approve or return promotion sheets and approve or reject transfers.",
     "learners.import_learners": "Register many learners at once from the Excel template.",
     "attendance.take_register": "Take the daily register, for a class they are class teacher of.",
     "attendance.correct_attendance": "Correct any class's register, with a reason.",

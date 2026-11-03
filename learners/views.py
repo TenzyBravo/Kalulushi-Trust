@@ -185,6 +185,8 @@ def profile(request, pk):
         ctx["links"] = [(l, l.guardian.contacts.all()) for l in links]
     elif tab == "enrollments":
         ctx["enrollments"] = learner.enrollments.select_related("class_group", "academic_year", "created_by", "approved_by")
+        ctx["requests"] = learner.enrollment_requests.select_related(
+            "from_enrollment__class_group", "to_class", "requested_by", "decided_by").exclude(status="draft")
     elif tab == "attendance":
         ctx.update(attendance_summary(learner, request.GET.get("term")))
     elif tab == "results":
@@ -369,9 +371,14 @@ def contact_verify(request, pk, contact_pk):
 # Enrollments -------------------------------------------------------------------------------
 
 @login_required
-@permission_required("learners.transfer_learner", raise_exception=True)
+@permission_required("learners.request_transfer", raise_exception=True)
 def transfer(request, pk):
+    """Request a class transfer; the Headteacher approves it before it takes effect (promotions design, P6)."""
+    from . import promotions
+
     learner = _visible_learner(request, pk)
+    if not promotions.can_request_transfer(request.user, learner):
+        raise PermissionDenied
     current = learner.current_enrollment()
     if current is None:
         messages.error(request, "This learner has no current enrolment.")
@@ -380,17 +387,21 @@ def transfer(request, pk):
     if request.method == "POST" and form.is_valid():
         d = form.cleaned_data
         try:
-            services.transfer(learner, d["to_class"], d["effective_date"], d["reason"], request.user)
-        except ValidationError as exc:
-            for m in exc.messages:
+            req = promotions.request_transfer(request.user, learner, d["to_class"], d["effective_date"], d["reason"])
+        except (ValidationError, PermissionDenied) as exc:
+            for m in _messages_from(exc):
                 form.add_error(None, m)
         else:
-            messages.success(request, f"Transferred to {d['to_class'].name} from {d['effective_date']}.")
+            if req.status == req.APPROVED:
+                messages.success(request, f"Transferred to {d['to_class'].name} from {d['effective_date']}.")
+            else:
+                messages.success(request, f"Transfer to {d['to_class'].name} requested. It takes effect once the Headteacher approves it.")
             return redirect(_profile_url(learner, "enrollments"))
     return render(request, "form.html", {
-        "form": form, "title": f"Transfer {learner.full_name} from {current.class_group.name}",
+        "form": form, "title": f"Request a transfer for {learner.full_name} from {current.class_group.name}",
         "cancel": _profile_url(learner, "enrollments"),
-        "intro": "Records before the transfer stay with the old class; records from the effective date belong to the new one.",
+        "intro": "The Headteacher approves transfers before they take effect. Records before the transfer stay with "
+                 "the old class; records from the effective date belong to the new one.",
     })
 
 

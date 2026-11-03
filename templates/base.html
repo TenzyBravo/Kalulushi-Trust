@@ -220,6 +220,7 @@
       {% if perms.attendance.view_absencecase %}<a href="{% url 'attendance_followup' %}">Follow-up</a>{% endif %}
       {% if perms.assessment.view_assessment %}<a href="{% url 'assessment_home' %}">Assessments</a>{% endif %}
       {% if perms.learners.view_learner %}<a href="{% url 'learner_list' %}">Learners</a>{% endif %}
+      {% if perms.learners.prepare_promotions %}<a href="{% url 'promotions' %}">Promotions</a>{% endif %}
       {% if perms.learners.add_learner %}<a href="{% url 'learner_register' %}">Register</a>{% endif %}
       {% if perms.learners.import_learners %}<a href="{% url 'learner_import' %}">Import</a>{% endif %}
       {% if perms.staffing.view_teacherassignment %}<a href="{% url 'assignments' %}">Assignments</a>{% endif %}

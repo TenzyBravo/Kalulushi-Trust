@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}{{ class_group.name }} promotion sheet{% endblock %}
+{% block content %}
+<p class="muted"><a href="{% url 'promotions' %}">Promotions</a></p>
+<div class="section-head">
+  <div>
+    <p class="section-eyebrow">Promotion sheet{% if to_year %} · into {{ to_year }}{% endif %}</p>
+    <h1 class="section-title">{{ class_group.name }} · {{ class_group.grade.name }}</h1>
+  </div>
+  {% if batch %}<span class="tag{% if batch.status == 'approved' %} ok{% elif batch.status == 'returned' %} bad{% else %} warn{% endif %}">{{ batch.get_status_display }}</span>{% endif %}
+</div>
+
+{% if not to_year %}<div class="notice">The next academic year has not been set up yet.</div>{% endif %}
+{% if batch.status == "returned" %}<div class="danger-zone"><strong>Returned by {{ batch.decided_by|default:"the Headteacher" }}:</strong> {{ batch.decision_note }}</div>{% endif %}
+{% if batch.status == "submitted" %}<div class="notice">Waiting for the Headteacher's approval.</div>{% endif %}
+{% if batch.status == "approved" %}<div class="notice">Approved {{ batch.decided_at|date:"j M Y" }} by {{ batch.decided_by }}. The new enrolments start on {{ to_year.start_date|date:"j M Y" }}.</div>{% endif %}
+{% if errors %}<div class="danger-zone"><ul class="errorlist">{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul></div>{% endif %}
+
+<form method="post">{% csrf_token %}
+<div class="table-wrap card flush"><table>
+  <thead><tr><th>Learner</th><th>{{ term|default:"Term" }} result</th><th>Attendance</th><th>Decision</th><th>Class in {{ to_year }}</th><th>Note</th></tr></thead>
+  <tbody>{% for enrollment, req, overall, rate in rows %}
+    <tr>
+      <td><strong>{{ enrollment.learner.full_name }}</strong><div class="register-number">{{ enrollment.learner.learner_number }}</div></td>
+      <td>{% if overall is not None %}{{ overall }}%{% else %}<span class="muted">pending</span>{% endif %}</td>
+      <td>{% if rate is not None %}{{ rate }}%{% else %}<span class="muted">—</span>{% endif %}</td>
+      {% if editable %}
+      <td><select name="decision_{{ enrollment.learner_id }}" aria-label="Decision">
+        {% for v, l in decisions %}<option value="{{ v }}"{% if req.decision == v %} selected{% endif %}>{{ l }}</option>{% endfor %}</select></td>
+      <td><select name="class_{{ enrollment.learner_id }}" aria-label="Class next year"><option value="">—</option>
+        {% for c in to_classes %}<option value="{{ c.pk }}"{% if req.to_class_id == c.pk %} selected{% endif %}>{{ c.name }}</option>{% endfor %}</select></td>
+      <td><input type="text" name="note_{{ enrollment.learner_id }}" value="{{ req.note }}" placeholder="Needed for repeat, hold, leaving" aria-label="Note"></td>
+      {% else %}
+      <td>{{ req.get_decision_display }}</td><td>{{ req.to_class.name|default:"—" }}</td><td class="small">{{ req.note }}</td>
+      {% endif %}
+    </tr>
+  {% empty %}<tr><td colspan="6" class="muted">No learners in this class at the end of the year.</td></tr>{% endfor %}</tbody>
+</table></div>
+{% if editable and rows %}
+<div class="register-spacer"></div>
+<div class="register-bar">
+  <button type="submit" name="action" value="save" class="register-bar-btn">Save</button>
+  <a class="register-bar-btn" href="{% url 'promotions' %}">Back</a>
+  <button type="submit" name="action" value="submit" class="btn register-save">Submit to the Headteacher</button>
+</div>
+{% endif %}
+</form>
+{% endblock %}

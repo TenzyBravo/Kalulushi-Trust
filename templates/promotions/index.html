@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Promotions{% endblock %}
+{% block content %}
+<p class="section-eyebrow">Year end</p>
+<h1 class="section-title">Promotions{% if year %} · {{ year }}{% if to_year %} → {{ to_year }}{% endif %}{% endif %}</h1>
+<p class="section-intro">Each class teacher prepares their class's promotion sheet; the Headteacher approves it before any learner moves.
+New enrolments start on the first day of {{ to_year|default:"next year" }}.</p>
+
+{% if can_approve %}
+<div class="actions"><a class="btn" href="{% url 'promotion_approvals' %}">Approvals{% if pending.sheets or pending.transfers %} ({{ pending.sheets|add:pending.transfers }} waiting){% endif %}</a></div>
+{% endif %}
+
+{% if not year %}<div class="notice">No academic year is current.</div>
+{% elif not to_year %}<div class="notice">Set up {{ year }}'s next academic year, with its classes, in School setup before preparing promotions.</div>{% endif %}
+
+<div class="explore">
+  {% for c, batch in rows %}
+  <a class="explore-card" href="{% url 'promotion_sheet' c.pk %}">
+    <span class="explore-icon">{% include "icons.html" with name="people" %}</span>
+    <span class="explore-body"><span class="explore-value">{{ c.name }}</span>
+      <span class="explore-name">{{ c.grade.name }}</span></span>
+    <span class="reg-state {% if not batch %}not_taken{% elif batch.status == 'approved' %}taken{% else %}closed{% endif %}">
+      {% if not batch %}Not started{% else %}{{ batch.get_status_display }}{% endif %}</span>
+  </a>
+  {% empty %}<p class="muted">No classes to promote.</p>{% endfor %}
+</div>
+{% endblock %}

@@ -73,9 +73,28 @@ def home(request):
             cover_teacher=user, revoked_at__isnull=True, ends_at__gt=timezone.now()
         ).select_related("teacher_assignment__class_subject__class_group", "teacher_assignment__class_subject__subject")
     # Registers and absence cases (slice 2) for everyone who works with attendance.
-    ctx["attention"] = ctx.get("attention", []) + attendance_dashboard.attention_items(user)
+    ctx["attention"] = ctx.get("attention", []) + attendance_dashboard.attention_items(user) + promotion_items(user)
     ctx["attention_total"] = sum(count for count, _, _ in ctx["attention"])
     return render(request, "home.html", ctx)
+
+
+def promotion_items(user):
+    """Promotion sheets and transfers waiting (promotions design §5)."""
+    from learners import promotions
+    from learners.models import PromotionBatch
+
+    items = []
+    pending = promotions.pending_counts(user)
+    if pending:
+        items.append((pending["sheets"], "promotion sheets to approve", reverse("promotion_approvals")))
+        items.append((pending["transfers"], "transfer requests to approve", reverse("promotion_approvals")))
+    year = AcademicYear.current(user.school)
+    if year and not access.sees_whole_school(user) and promotions.next_year(year):
+        for c in year.classes.filter(status="active"):
+            if promotions.is_class_teacher_of(user, c) and not PromotionBatch.objects.filter(
+                    from_class=c, status__in=[PromotionBatch.SUBMITTED, PromotionBatch.APPROVED]).exists():
+                items.append((1, f"promotion sheet for {c.name} to submit", reverse("promotion_sheet", args=[c.pk])))
+    return items
 
 
 @login_required
