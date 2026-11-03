@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Missing and incomplete · {{ term }}{% endblock %}
+{% block content %}
+<p class="muted"><a href="{% url 'assessment_home' %}?term={{ term.pk }}">Assessments</a></p>
+<div class="section-head">
+  <div>
+    <p class="section-eyebrow">Before report cards</p>
+    <h1 class="section-title">Missing and incomplete · {{ term }}</h1>
+  </div>
+  <form method="get" class="inline-form"><select name="term" onchange="this.form.submit()" aria-label="Term">
+    {% for t in terms %}<option value="{{ t.pk }}"{% if t == term %} selected{% endif %}>{{ t }}</option>{% endfor %}</select></form>
+</div>
+
+<h2>Assessments not yet submitted</h2>
+<div class="table-wrap card flush"><table>
+  <thead><tr><th>Class</th><th>Subject</th><th>Assessment</th><th>Date</th></tr></thead>
+  <tbody>{% for a in drafts %}
+    <tr><td>{{ a.class_subject.class_group.name }}</td><td>{{ a.class_subject.subject.name }}</td>
+      <td><a href="{% url 'assessment_marks' a.pk %}">{{ a.title }}</a></td><td>{{ a.assessed_on|date:"j M" }}</td></tr>
+  {% empty %}<tr><td colspan="4" class="muted">None.</td></tr>{% endfor %}</tbody>
+</table></div>
+
+<h2>Submitted with missing results</h2>
+<div class="table-wrap card flush"><table>
+  <thead><tr><th>Class</th><th>Subject</th><th>Assessment</th><th>Missing</th></tr></thead>
+  <tbody>{% for a in with_missing %}
+    <tr><td>{{ a.class_subject.class_group.name }}</td><td>{{ a.class_subject.subject.name }}</td>
+      <td><a href="{% url 'assessment_marks' a.pk %}">{{ a.title }}</a></td><td><span class="tag warn">{{ a.missing }}</span></td></tr>
+  {% empty %}<tr><td colspan="4" class="muted">None.</td></tr>{% endfor %}</tbody>
+</table></div>
+
+<h2>End-of-term competencies</h2>
+<div class="table-wrap card flush"><table>
+  <thead><tr><th>Class</th><th>Sheet</th><th>Not assessed</th></tr></thead>
+  <tbody>{% for c, sheet in sheet_rows %}
+    <tr><td><a href="{% url 'assessment_competencies' c.pk %}?term={{ term.pk }}">{{ c.name }}</a></td>
+      <td>{% if not sheet %}<span class="tag bad">not started</span>{% elif sheet.status == "draft" %}<span class="tag warn">draft</span>{% else %}<span class="tag ok">submitted</span>{% endif %}</td>
+      <td>{% if sheet.not_assessed %}<span class="tag warn">{{ sheet.not_assessed }}</span>{% endif %}</td></tr>
+  {% empty %}<tr><td colspan="3" class="muted">No classes.</td></tr>{% endfor %}</tbody>
+</table></div>
+{% endblock %}

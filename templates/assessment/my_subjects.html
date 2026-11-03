@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Assessments{% endblock %}
+{% block content %}
+<div class="section-head">
+  <div>
+    <p class="section-eyebrow">Marks and competencies</p>
+    <h1 class="section-title">Assessments{% if term %} · {{ term }}{% endif %}</h1>
+  </div>
+  {% if terms %}<form method="get" class="inline-form">
+    <select name="term" onchange="this.form.submit()" aria-label="Term">
+      {% for t in terms %}<option value="{{ t.pk }}"{% if t == term %} selected{% endif %}>{{ t }}</option>{% endfor %}
+    </select></form>{% endif %}
+</div>
+{% if not term %}<div class="notice">No academic year with terms is current yet. Set it up in School setup.</div>{% else %}
+
+<div class="actions"><a class="btn secondary" href="{% url 'assessment_incomplete' %}?term={{ term.pk }}">Missing and incomplete</a></div>
+
+<h2>{% if all_classes %}Class subjects{% else %}My subjects{% endif %}</h2>
+<div class="explore">
+  {% for cs in class_subjects %}
+  <a class="explore-card" href="{% url 'assessment_subject' cs.pk %}?term={{ term.pk }}">
+    <span class="explore-icon">{% include "icons.html" with name="book" %}</span>
+    <span class="explore-body">
+      <span class="explore-value">{{ cs.class_group.name }} · {{ cs.subject.name }}</span>
+      <span class="explore-name">{{ cs.n }} assessment{{ cs.n|pluralize }}{% if cs.drafts %} · <strong>{{ cs.drafts }} draft{{ cs.drafts|pluralize }}</strong>{% endif %}</span>
+    </span>
+    <span class="explore-chevron" aria-hidden="true">›</span>
+  </a>
+  {% empty %}
+  <p class="muted">{% if all_classes %}No class subjects this year.{% else %}You are not assigned to teach any class subject this term.{% endif %}</p>
+  {% endfor %}
+</div>
+
+{% if my_classes or all_classes %}
+<h2>Class results and competencies</h2>
+<div class="table-wrap card flush"><table>
+  <thead><tr><th>Class</th><th></th><th></th></tr></thead>
+  <tbody>{% for c in my_classes|default:all_classes %}
+    <tr><td>{{ c.name }}</td>
+      <td><a href="{% url 'assessment_class_results' c.pk %}?term={{ term.pk }}">Term results</a></td>
+      <td><a href="{% url 'assessment_competencies' c.pk %}?term={{ term.pk }}">End-of-term competencies</a></td></tr>
+  {% endfor %}</tbody>
+</table></div>
+{% endif %}
+{% endif %}
+{% endblock %}

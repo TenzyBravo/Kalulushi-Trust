@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}{{ learner.full_name }} · {{ assessment.title }}{% endblock %}
+{% block content %}
+<p class="muted"><a href="{% url 'assessment_marks' assessment.pk %}">{{ assessment.class_subject.class_group.name }} · {{ assessment.class_subject.subject.name }} · {{ assessment.title }}</a></p>
+<h1>{{ learner.full_name }} <span class="muted small">{{ learner.learner_number }}</span></h1>
+<p class="muted">Out of {{ assessment.max_score|floatformat:"-2" }} ·
+  {% if result.score is not None %}mark {{ result.score|floatformat:"-2" }}{% elif result.missing_status %}{{ result.get_missing_status_display }}{% else %}nothing entered{% endif %}</p>
+
+{% if allowed %}
+<form method="post" class="card">{% csrf_token %}
+  {% if submitted %}<div class="notice">This assessment is submitted. Your change is a correction: give a reason. The old and new values are kept permanently.</div>{% endif %}
+  {% include "includes/fields.html" %}
+  <div class="actions"><button class="btn" type="submit">{% if submitted %}Save correction{% else %}Save{% endif %}</button>
+    <a href="{% url 'assessment_marks' assessment.pk %}">Cancel</a></div>
+</form>
+{% endif %}
+
+{% if history %}
+<h2>Corrections</h2>
+<div class="table-wrap card flush"><table>
+  <thead><tr><th>When</th><th>By</th><th>Change</th><th>Reason</th></tr></thead>
+  <tbody>{% for h in history %}
+    <tr><td>{{ h.changed_at|date:"j M Y H:i" }}</td><td>{{ h.changed_by }}</td>
+      <td>{{ h.old_score|default_if_none:h.old_missing_status|default:"—" }} → {{ h.new_score|default_if_none:h.new_missing_status|default:"—" }}</td>
+      <td class="small">{{ h.reason }}</td></tr>
+  {% endfor %}</tbody>
+</table></div>
+{% endif %}
+{% endblock %}
