@@ -97,7 +97,6 @@ log. Support notes never appear in any report or export (slice 1 rule).
 
 ## 7. Next steps
 
-1. Answer R1–R6.
-2. Build: report queries from source records, the seven report pages (report-card status as a
+1. Build: report queries from source records, the seven report pages (report-card status as a
    placeholder), Excel and print exports, the exports log and trigger, the learner report, tests that
    reports match the screens and respect access.
