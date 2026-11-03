@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}{{ assessment.title }} · {{ assessment.class_subject.class_group.name }}{% endblock %}
+{% block content %}
+<div class="register">
+<p class="muted"><a href="{% url 'assessment_subject' assessment.class_subject_id %}?term={{ assessment.term_id }}">{{ assessment.class_subject.class_group.name }} · {{ assessment.class_subject.subject.name }}</a></p>
+<div class="register-head">
+  <div>
+    <p class="section-eyebrow">{{ assessment.component.name }} · {{ assessment.term }}</p>
+    <h1 class="section-title">{{ assessment.title }} <span class="muted small">out of {{ assessment.max_score|floatformat:"-2" }}</span></h1>
+  </div>
+  <div><span class="tag{% if assessment.status == 'submitted' %} ok{% else %} warn{% endif %}">{{ assessment.status }}</span>
+    <span class="muted small" id="save-status" aria-live="polite">{% if can_enter %}{{ complete }} of {{ rows|length }} entered{% endif %}</span></div>
+</div>
+
+{% if assessment.status == "submitted" %}
+<div class="notice">Submitted {{ assessment.submitted_at|date:"j M Y H:i" }} by {{ assessment.submitted_by }}.
+  {% if can_correct %}To change a result, open the learner and give a reason; every correction is recorded.{% endif %}</div>
+{% endif %}
+{% if form_errors %}<div class="danger-zone"><ul class="errorlist">{% for e in form_errors %}<li>{{ e }}</li>{% endfor %}</ul></div>{% endif %}
+
+<form method="post" id="marks-form" data-save-url="{% url 'assessment_marks_save' assessment.pk %}">
+  {% csrf_token %}
+  <div class="register-filter">
+    <input type="search" id="register-search" placeholder="Search by name or learner number" aria-label="Search learners">
+  </div>
+  <div class="table-wrap"><table class="marks-table">
+    <thead><tr><th>Learner</th><th>Mark</th><th>Or missing</th><th>Comment</th><th></th></tr></thead>
+    <tbody>{% for row in rows %}
+      <tr class="marks-row" data-learner="{{ row.learner.pk }}" data-name="{{ row.learner.full_name|lower }} {{ row.learner.learner_number|lower }}">
+        <td><strong>{{ row.learner.full_name }}</strong><div class="register-number">{{ row.learner.learner_number }}</div>
+          {% if row.error %}<div class="errorlist">{{ row.error }}</div>{% endif %}</td>
+        {% if can_enter %}
+        <td><input type="text" inputmode="decimal" name="score_{{ row.learner.pk }}" value="{{ row.score }}" class="mark-input" aria-label="Mark for {{ row.learner.full_name }}" autocomplete="off"></td>
+        <td><select name="missing_{{ row.learner.pk }}" aria-label="Missing status">{% for v, l in missing_choices %}<option value="{{ v }}"{% if v == row.missing %} selected{% endif %}>{{ l }}</option>{% endfor %}</select></td>
+        <td><input type="text" name="comment_{{ row.learner.pk }}" value="{{ row.comment }}" maxlength="500" aria-label="Comment"></td>
+        <td><span class="row-status small muted"></span> <a class="small" href="{% url 'assessment_learner' assessment.pk row.learner.pk %}">details</a></td>
+        {% else %}
+        <td>{% if row.result.score is not None %}<strong>{{ row.result.score|floatformat:"-2" }}</strong>{% endif %}</td>
+        <td>{% if row.result.missing_status %}<span class="tag warn">{{ row.result.get_missing_status_display }}</span>{% elif not row.result %}<span class="muted">—</span>{% endif %}</td>
+        <td class="small">{{ row.result.comment }}</td>
+        <td>{% if can_correct %}<a class="small" href="{% url 'assessment_learner' assessment.pk row.learner.pk %}">Correct</a>{% endif %}</td>
+        {% endif %}
+      </tr>
+    {% endfor %}</tbody>
+  </table></div>
+
+  {% if can_enter %}
+  <div class="register-spacer"></div>
+  <div class="register-bar">
+    <button type="submit" name="action" value="save" class="register-bar-btn">Save draft</button>
+    <a class="register-bar-btn" href="{% url 'assessment_subject' assessment.class_subject_id %}?term={{ assessment.term_id }}">Back</a>
+    <button type="submit" name="action" value="submit" class="btn register-save"
+            onclick="return confirm('Submit marks for the whole class? After this, changes are corrections with a reason.')">Submit class</button>
+  </div>
+  {% endif %}
+</form>
+</div>
+
+{% if can_enter %}
+<script>
+(function () {
+  var form = document.getElementById("marks-form"), status = document.getElementById("save-status");
+  var csrf = form.querySelector("input[name=csrfmiddlewaretoken]").value, timers = {};
+  function setStatus(text) { status.textContent = text; }
+  function save(row) {
+    var id = row.dataset.learner, mark = row.querySelector("[name=score_" + id + "]");
+    var missing = row.querySelector("[name=missing_" + id + "]"), comment = row.querySelector("[name=comment_" + id + "]");
+    var cell = row.querySelector(".row-status");
+    if (mark.value.trim() && missing.value) { missing.value = ""; }
+    setStatus("Saving…"); cell.textContent = "";
+    fetch(form.dataset.saveUrl, {
+      method: "POST", headers: {"Content-Type": "application/json", "X-CSRFToken": csrf},
+      body: JSON.stringify({learner: id, score: mark.value, missing: missing.value, comment: comment.value})
+    }).then(function (r) { return r.json().then(function (d) { return {ok: r.ok && d.ok, d: d}; }); })
+      .then(function (res) {
+        if (res.ok) { setStatus("Saved"); cell.textContent = "✓"; row.classList.remove("row-error"); }
+        else { setStatus("Save failed"); cell.textContent = res.d.error || "Save failed"; row.classList.add("row-error"); }
+      }).catch(function () { setStatus("Save failed: check your connection"); cell.textContent = "not saved"; });
+  }
+  form.addEventListener("input", function (e) {
+    var row = e.target.closest(".marks-row"); if (!row) return;
+    clearTimeout(timers[row.dataset.learner]);
+    timers[row.dataset.learner] = setTimeout(function () { save(row); }, 700);
+  });
+  form.addEventListener("change", function (e) {
+    var row = e.target.closest(".marks-row"); if (row && e.target.tagName === "SELECT") { save(row); }
+  });
+  var search = document.getElementById("register-search");
+  search.addEventListener("input", function () {
+    var q = search.value.trim().toLowerCase();
+    form.querySelectorAll(".marks-row").forEach(function (row) { row.style.display = !q || row.dataset.name.indexOf(q) !== -1 ? "" : "none"; });
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}

@@ -12,6 +12,7 @@ from . import roles
 MODULES = [
     ("learners", "Learners and guardians"),
     ("attendance", "Attendance and follow-up"),
+    ("assessment", "Assessments and competencies"),
     ("staffing", "Teaching assignments and cover"),
     ("school", "School structure"),
     ("accounts", "Staff accounts"),
@@ -32,6 +33,9 @@ TYPE_OVERRIDES = {
     "attendance.correct_attendance": "edit",
     "attendance.take_register": "create",
     "attendance.add_closure": "create",
+    "assessment.enter_marks": "create",
+    "assessment.record_competencies": "create",
+    "assessment.correct_marks": "edit",
 }
 
 DESCRIPTIONS = {
@@ -46,6 +50,9 @@ DESCRIPTIONS = {
     "attendance.correct_attendance": "Correct any class's register, with a reason.",
     "attendance.add_closure": "Close the school, a grade or a class (e.g. exam classes finishing early).",
     "attendance.review_escalations": "Review and close absence cases referred to the Headteacher.",
+    "assessment.enter_marks": "Create assessments and enter marks, for class subjects they teach (or cover).",
+    "assessment.record_competencies": "Record end-of-term competencies, for the class they are class teacher of.",
+    "assessment.correct_marks": "Correct any submitted marks or competencies, with a reason.",
 }
 
 # Permissions that may be given to one person on top of their roles (design: "user_permissions").

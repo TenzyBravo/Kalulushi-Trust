@@ -161,6 +161,12 @@ class Calendar(AttendanceTestCase):
         self.assertTrue(CalendarEvent.objects.filter(name="Easter Monday", start_date=D(2026, 4, 6)).exists())
         self.assertFalse(for_days(D(2026, 3, 1), D(2026, 3, 31)).is_school_day(D(2026, 3, 12)))  # Youth Day
 
+    def test_seed_holidays_without_arguments_as_on_deploy(self):
+        out = io.StringIO()
+        call_command("seed_holidays", stdout=out)  # current year, first System Administrator
+        self.assertIn("Added 17 public holiday(s) to 2026", out.getvalue())
+        self.assertEqual(CalendarEvent.objects.first().created_by, self.admin)
+
 
 class Registers(AttendanceTestCase):
     def test_class_teacher_takes_the_register(self):

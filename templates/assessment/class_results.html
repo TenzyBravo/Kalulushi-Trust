@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}{{ class_group.name }} results · {{ term }}{% endblock %}
+{% block content %}
+<p class="muted"><a href="{% url 'assessment_home' %}?term={{ term.pk }}">Assessments</a></p>
+<div class="section-head">
+  <div>
+    <p class="section-eyebrow">Term results</p>
+    <h1 class="section-title">{{ class_group.name }} · {{ term }}</h1>
+  </div>
+  <form method="get" class="inline-form"><select name="term" onchange="this.form.submit()" aria-label="Term">
+    {% for t in terms %}<option value="{{ t.pk }}"{% if t == term %} selected{% endif %}>{{ t }}</option>{% endfor %}</select></form>
+</div>
+<p class="muted small">{% if plan %}Graded with {{ plan.grading_scheme }}.{% if plan.status != "active" %} <span class="tag warn">The assessment plan is not active yet (weights not set), so scores are pending.</span>{% endif %}{% else %}No assessment plan for this term.{% endif %}
+  Overall score is the average of subject scores, only when every subject has one.{% if not rankings %} Positions are off.{% endif %}</p>
+
+<div class="table-wrap card flush"><table>
+  <thead><tr>{% if rankings %}<th>Pos.</th>{% endif %}<th>Learner</th>{% for cs in class_subjects %}<th>{{ cs.subject.name }}</th>{% endfor %}<th>Overall</th></tr></thead>
+  <tbody>{% for r in rows %}
+    <tr>{% if rankings %}<td>{{ r.position|default:"—" }}</td>{% endif %}
+      <td><a href="{% url 'learner_profile' r.learner.pk %}?tab=results">{{ r.learner.full_name }}</a></td>
+      {% for s in r.subjects %}<td>{% if s.complete %}{{ s.percent }}<span class="muted small"> {{ s.band.label|default:"" }}</span>{% else %}<span class="muted" title="{{ s.pending }}">pending</span>{% endif %}</td>{% endfor %}
+      <td>{% if r.overall is not None %}<strong>{{ r.overall }}</strong>{% else %}<span class="tag">pending</span>{% endif %}</td></tr>
+  {% empty %}<tr><td colspan="9" class="muted">No learners in this class.</td></tr>{% endfor %}</tbody>
+</table></div>
+{% endblock %}

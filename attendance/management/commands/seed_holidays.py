@@ -8,6 +8,7 @@ from datetime import date, timedelta
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
+from accounts import roles
 from accounts.models import User
 from attendance.models import CalendarEvent
 from core import audit
@@ -64,30 +65,50 @@ def zambian_holidays(year):
 
 
 class Command(BaseCommand):
-    help = "Add Zambia's public holidays for an academic year to the school calendar."
+    help = (
+        "Add Zambia's public holidays to the school calendar. With no --year, covers the current and any "
+        "planned academic years. Safe to re-run: only missing holidays are added. Runs on every deploy."
+    )
 
     def add_arguments(self, parser):
-        parser.add_argument("--year", required=True, help="Academic year name, e.g. 2027")
-        parser.add_argument("--as-user", required=True, help="Username recorded as adding them")
+        parser.add_argument("--year", help="Academic year name, e.g. 2027 (default: current and planned years)")
+        parser.add_argument("--as-user", help="Username recorded as adding them (default: the first System Administrator)")
+
+    def _actor(self, as_user):
+        if as_user:
+            try:
+                return User.objects.get(username=as_user, is_active=True)
+            except User.DoesNotExist:
+                raise CommandError(f"No active user '{as_user}'.")
+        return (
+            User.objects.filter(is_active=True, is_superuser=True).order_by("pk").first()
+            or User.objects.filter(is_active=True, groups__name=roles.SYSTEM_ADMIN).order_by("pk").first()
+        )
 
     @transaction.atomic
-    def handle(self, year, as_user, **options):
+    def handle(self, year=None, as_user=None, **options):
         school = School.current()
-        academic_year = AcademicYear.objects.filter(school=school, name=year).first()
-        if academic_year is None:
-            raise CommandError(f"No academic year '{year}'.")
-        try:
-            actor = User.objects.get(username=as_user, is_active=True)
-        except User.DoesNotExist:
-            raise CommandError(f"No active user '{as_user}'.")
-        added = 0
-        for name, day in zambian_holidays(academic_year.start_date.year):
-            if not academic_year.contains(day):
-                continue
-            _, created = CalendarEvent.objects.get_or_create(
-                school=school, academic_year=academic_year, kind=CalendarEvent.HOLIDAY, name=name, start_date=day,
-                defaults={"end_date": day, "created_by": actor},
-            )
-            added += created
-        audit.record("calendar_event.seed_holidays", academic_year, school=school, actor=actor, changes={"added": added})
-        self.stdout.write(self.style.SUCCESS(f"Added {added} public holiday(s) to {academic_year}."))
+        if year:
+            years = list(AcademicYear.objects.filter(school=school, name=year))
+            if not years:
+                raise CommandError(f"No academic year '{year}'.")
+        else:
+            years = list(AcademicYear.objects.filter(school=school, status__in=[AcademicYear.CURRENT, AcademicYear.PLANNED]))
+        actor = self._actor(as_user)
+        if not years or actor is None:
+            self.stdout.write("No academic year or administrator yet; public holidays not added.")
+            return
+        for academic_year in years:
+            added = 0
+            for name, day in zambian_holidays(academic_year.start_date.year):
+                if not academic_year.contains(day):
+                    continue
+                _, created = CalendarEvent.objects.get_or_create(
+                    school=school, academic_year=academic_year, kind=CalendarEvent.HOLIDAY, name=name, start_date=day,
+                    defaults={"end_date": day, "created_by": actor},
+                )
+                added += created
+            if added:
+                audit.record("calendar_event.seed_holidays", academic_year, school=school, actor=actor,
+                             changes={"added": added})
+            self.stdout.write(self.style.SUCCESS(f"Added {added} public holiday(s) to {academic_year}."))

@@ -193,6 +193,8 @@ class ClassSubject(models.Model):
         ordering = ["class_group", "subject__name"]
         constraints = [
             models.UniqueConstraint(fields=["class_group", "subject"], name="class_subjects_unique"),
+            # Target of the composite key from assessment_results (slice 3).
+            models.UniqueConstraint(fields=["id", "class_group"], name="class_subjects_id_class_unique"),
             status_check("class_subjects_status_valid", "status", ["active", "dropped"]),
         ]
 

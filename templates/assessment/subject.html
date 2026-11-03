@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}{{ class_subject.class_group.name }} {{ class_subject.subject.name }}{% endblock %}
+{% block content %}
+<p class="muted"><a href="{% url 'assessment_home' %}?term={{ term.pk }}">Assessments</a></p>
+<div class="section-head">
+  <div>
+    <p class="section-eyebrow">{{ term }}</p>
+    <h1 class="section-title">{{ class_subject.class_group.name }} · {{ class_subject.subject.name }}</h1>
+  </div>
+  <form method="get" class="inline-form"><select name="term" onchange="this.form.submit()" aria-label="Term">
+    {% for t in terms %}<option value="{{ t.pk }}"{% if t == term %} selected{% endif %}>{{ t }}</option>{% endfor %}</select></form>
+</div>
+
+{% if not plan %}
+<div class="notice">There is no assessment plan for {{ class_subject.class_group.grade }} in {{ term }} yet, so assessments cannot be created. The Academic Administrator adds it in School setup.</div>
+{% else %}
+<p class="muted small">Plan: {% for c in plan.components.all %}{{ c.name }} {% if c.weight is not None %}{{ c.weight|floatformat:"-2" }}%{% else %}(weight not set){% endif %}{% if not forloop.last %} + {% endif %}{% endfor %}
+  · graded with {{ plan.grading_scheme }}{% if plan.status != "active" %} · <span class="tag warn">plan not active: subject scores pending</span>{% endif %}</p>
+{% endif %}
+
+<h2>Assessments</h2>
+<div class="table-wrap card flush"><table>
+  <thead><tr><th>Title</th><th>Component</th><th>Type</th><th>Out of</th><th>Date</th><th>Status</th></tr></thead>
+  <tbody>{% for a in assessments %}
+    <tr><td><a href="{% url 'assessment_marks' a.pk %}">{{ a.title }}</a></td><td>{{ a.component.name }}</td><td>{{ a.assessment_type }}</td>
+      <td>{{ a.max_score|floatformat:"-2" }}</td><td>{{ a.assessed_on|date:"j M" }}</td>
+      <td><span class="tag{% if a.status == 'submitted' %} ok{% else %} warn{% endif %}">{{ a.status }}</span></td></tr>
+  {% empty %}<tr><td colspan="6" class="muted">No assessments yet this term.</td></tr>{% endfor %}</tbody>
+</table></div>
+
+{% if can_enter and plan %}
+<details class="card"{% if form.errors %} open{% endif %}>
+  <summary><strong>New assessment</strong></summary>
+  <form method="post">{% csrf_token %}<input type="hidden" name="term" value="{{ term.pk }}">
+    {% include "includes/fields.html" %}
+    <div class="actions"><button class="btn" type="submit">Create and enter marks</button></div>
+  </form>
+</details>
+{% endif %}
+
+{% if assessments %}
+<h2>Marks so far</h2>
+<div class="table-wrap card flush"><table>
+  <thead><tr><th>Learner</th>{% for a in assessments %}<th title="{{ a.component.name }}">{{ a.title }}<div class="small muted">/{{ a.max_score|floatformat:"-2" }}</div></th>{% endfor %}<th>Term score</th><th>Grade</th></tr></thead>
+  <tbody>{% for learner, cells, score in rows %}
+    <tr><td>{{ learner.full_name }}</td>
+      {% for r in cells %}<td>{% if r.score is not None %}{{ r.score|floatformat:"-2" }}{% elif r.missing_status %}<span class="tag warn">{{ r.get_missing_status_display }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>{% endfor %}
+      <td>{% if score.complete %}<strong>{{ score.percent }}%</strong>{% else %}<span class="tag" title="{{ score.pending }}">pending</span>{% endif %}</td>
+      <td>{{ score.band.label|default:"" }}</td></tr>
+  {% endfor %}</tbody>
+</table></div>
+<p class="muted small">Only submitted assessments count towards the term score. Hover "pending" to see why.</p>
+{% endif %}
+{% endblock %}

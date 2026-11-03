@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}{{ class_group.name }} competencies · {{ term }}{% endblock %}
+{% block content %}
+<p class="muted"><a href="{% url 'assessment_home' %}?term={{ term.pk }}">Assessments</a></p>
+<div class="section-head">
+  <div>
+    <p class="section-eyebrow">End of term</p>
+    <h1 class="section-title">{{ class_group.name }} competencies · {{ term }}</h1>
+  </div>
+  <form method="get" class="inline-form"><select name="term" onchange="this.form.submit()" aria-label="Term">
+    {% for t in terms %}<option value="{{ t.pk }}"{% if t == term %} selected{% endif %}>{{ t }}</option>{% endfor %}</select></form>
+</div>
+{% if framework %}<p class="muted small">{{ framework }}{% if sheet %} · <span class="tag{% if sheet.status == 'submitted' %} ok{% else %} warn{% endif %}">{{ sheet.status }}</span>{% endif %}
+  · Missing competencies are <em>Not assessed</em>, never the lowest level.</p>{% endif %}
+{% if error %}<div class="notice">{{ error }}</div>{% endif %}
+{% if not editable and framework and not can_correct and not sheet %}<p class="muted">Only the class teacher records competencies. Nothing has been recorded yet.</p>{% endif %}
+
+{% if framework and rows %}
+<form method="post">{% csrf_token %}<input type="hidden" name="term" value="{{ term.pk }}">
+<div class="table-wrap card flush"><table class="competency-table">
+  <thead><tr><th>Learner</th>{% for c in competencies %}<th title="{{ c.description }}">{{ c.name }}</th>{% endfor %}</tr></thead>
+  <tbody>{% for learner, cells in rows %}
+    <tr><td><strong>{{ learner.full_name }}</strong>
+      {% if can_correct %}<div><a class="small" href="{% url 'assessment_competency_learner' sheet.pk learner.pk %}">correct</a></div>{% endif %}</td>
+      {% for c, r in cells %}<td>
+        {% if editable %}
+        <select name="c_{{ learner.pk }}_{{ c.pk }}" aria-label="{{ c.name }} for {{ learner.full_name }}">
+          <option value="">—</option>
+          <option value="not_assessed"{% if r.not_assessed %} selected{% endif %}>Not assessed</option>
+          {% for l in levels %}<option value="{{ l.pk }}"{% if r.level_id == l.pk %} selected{% endif %}>{{ l.label }}</option>{% endfor %}
+        </select>
+        {% else %}{% if r.not_assessed %}<span class="tag warn">Not assessed</span>{% else %}{{ r.level.label|default:"—" }}{% endif %}{% endif %}
+      </td>{% endfor %}</tr>
+  {% endfor %}</tbody>
+</table></div>
+{% if editable %}
+<div class="register-spacer"></div>
+<div class="register-bar">
+  <button type="submit" name="action" value="save" class="register-bar-btn">Save draft</button>
+  <a class="register-bar-btn" href="{% url 'assessment_home' %}?term={{ term.pk }}">Back</a>
+  <button type="submit" name="action" value="submit" class="btn register-save" onclick="return confirm('Submit competencies for the whole class?')">Submit class</button>
+</div>
+{% endif %}
+</form>
+{% endif %}
+{% endblock %}

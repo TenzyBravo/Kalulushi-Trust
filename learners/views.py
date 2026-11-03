@@ -25,8 +25,8 @@ TABS = [
     ("guardians", "Guardians and contacts", None),
     ("enrollments", "Enrolment and class history", None),
     ("attendance", "Attendance", None),
-    ("results", "Academic results", "module 3"),
-    ("competencies", "Competency development", "module 3"),
+    ("results", "Academic results", None),
+    ("competencies", "Competency development", None),
     ("reports", "Report cards", "module 4"),
     ("followup", "Absence follow-up", None),
 ]
@@ -67,6 +67,26 @@ def attendance_summary(learner, term_id=None):
         "terms": terms, "term": term, "records": records, "counts": counts,
         "attendance_rate": round(100 * attended / len(records)) if records else None,
     }
+
+
+def results_summary(learner):
+    """Term-by-term subject scores from submitted marks (slice 3), newest term first."""
+    from assessment import calc
+    from assessment.models import AssessmentResult
+    from school.models import Term
+
+    terms = Term.objects.filter(
+        assessments__results__learner=learner, assessments__status="submitted"
+    ).distinct().select_related("academic_year").order_by("-start_date")
+    by_term = []
+    for term in terms:
+        class_subjects = {r.assessment.class_subject for r in AssessmentResult.objects.filter(
+            learner=learner, assessment__term=term, assessment__status="submitted").select_related(
+            "assessment__class_subject__subject", "assessment__class_subject__class_group__grade")}
+        scores = [calc.subject_score(learner, cs, term) for cs in sorted(class_subjects, key=lambda c: c.subject.name)]
+        plan = calc.plan_for(next(iter(class_subjects)).class_group, term) if class_subjects else None
+        by_term.append({"term": term, "scores": scores, "scheme": plan.grading_scheme if plan else None})
+    return {"results_by_term": by_term}
 
 
 def _profile_url(learner, tab="personal"):
@@ -167,6 +187,16 @@ def profile(request, pk):
         ctx["enrollments"] = learner.enrollments.select_related("class_group", "academic_year", "created_by", "approved_by")
     elif tab == "attendance":
         ctx.update(attendance_summary(learner, request.GET.get("term")))
+    elif tab == "results":
+        ctx.update(results_summary(learner))
+    elif tab == "competencies":
+        from assessment.models import LearnerCompetencyResult
+
+        ctx["competency_results"] = (
+            LearnerCompetencyResult.objects.filter(learner=learner).select_related("sheet__term", "sheet__class_group",
+                                                                                  "sheet__framework", "competency", "level")
+            .order_by("-sheet__term__start_date", "competency__sequence")
+        )
     elif tab == "followup":
         ctx["cases"] = learner.absence_cases.select_related("class_group", "assigned_teacher").prefetch_related("actions")
         ctx["can_open_cases"] = user.has_perm("attendance.view_absencecase")

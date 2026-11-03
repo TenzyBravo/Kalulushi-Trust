@@ -13,6 +13,7 @@ urlpatterns = [
     path("password/", auth_views.PasswordChangeView.as_view(success_url="/"), name="password_change"),
     path("learners/", include("learners.urls")),
     path("attendance/", include("attendance.urls")),
+    path("assessment/", include("assessment.urls")),
     path("staff/", accounts_views.staff_list, name="staff_list"),
     path("staff/new/", accounts_views.staff_create, name="staff_create"),
     path("staff/<int:pk>/", accounts_views.staff_detail, name="staff_detail"),

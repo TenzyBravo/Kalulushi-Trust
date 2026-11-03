@@ -118,6 +118,38 @@
   {% empty %}<tr><td colspan="4" class="muted">No attendance recorded{% if term %} in {{ term }}{% endif %}.</td></tr>{% endfor %}</tbody>
 </table></div>
 
+{% elif tab == "results" %}
+{% for block in results_by_term %}
+<h2>{{ block.term }}{% if block.scheme %} <span class="muted small">· graded with {{ block.scheme }}</span>{% endif %}</h2>
+<div class="table-wrap card flush"><table>
+  <thead><tr><th>Subject</th><th>Score</th><th>Grade</th><th></th></tr></thead>
+  <tbody>{% for s in block.scores %}
+    <tr><td>{{ s.class_subject.subject.name }} <span class="muted small">{{ s.class_subject.class_group.name }}</span></td>
+      <td>{% if s.complete %}<strong>{{ s.percent }}%</strong>{% else %}<span class="tag warn">pending</span>{% endif %}</td>
+      <td>{{ s.band.label|default:"" }}</td>
+      <td class="small muted">{{ s.pending }}</td></tr>
+  {% endfor %}</tbody>
+</table></div>
+{% empty %}
+<p class="muted">No submitted marks yet.</p>
+{% endfor %}
+
+{% elif tab == "competencies" %}
+{% regroup competency_results by sheet as by_sheet %}
+{% for group in by_sheet %}
+<h2>{{ group.grouper.term }} <span class="muted small">· {{ group.grouper.class_group.name }} · {{ group.grouper.framework }}{% if group.grouper.status == "draft" %} · draft{% endif %}</span></h2>
+<div class="table-wrap card flush"><table>
+  <thead><tr><th>Competency</th><th>Level</th><th>Comment</th></tr></thead>
+  <tbody>{% for r in group.list %}
+    <tr><td>{{ r.competency.name }}</td>
+      <td>{% if r.not_assessed %}<span class="tag warn">Not assessed</span>{% else %}{{ r.level.label|default:"—" }}{% endif %}</td>
+      <td class="small">{{ r.comment }}</td></tr>
+  {% endfor %}</tbody>
+</table></div>
+{% empty %}
+<p class="muted">No competencies recorded yet. They are recorded at the end of each term.</p>
+{% endfor %}
+
 {% elif tab == "followup" %}
 {% for case in cases %}
 <div class="card">

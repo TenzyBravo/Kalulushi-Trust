@@ -41,6 +41,9 @@ class SchoolSettings(models.Model):
     absence_stale_days = models.SmallIntegerField(
         default=5, help_text="An open absence case with no action for this many school days is highlighted."
     )
+    rankings_enabled = models.BooleanField(
+        default=False, help_text="Show class, grade and subject positions. Off until a System Administrator turns it on."
+    )
 
     class Meta:
         db_table = "school_settings"

@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}{{ learner.full_name }} competencies{% endblock %}
+{% block content %}
+<p class="muted"><a href="{% url 'assessment_competencies' sheet.class_group_id %}?term={{ sheet.term_id }}">{{ sheet.class_group.name }} competencies · {{ sheet.term }}</a></p>
+<h1>{{ learner.full_name }} <span class="muted small">{{ learner.learner_number }}</span></h1>
+<nav class="tabs">{% for r in results %}<a href="?competency={{ r.competency_id }}"{% if r == result %} class="on"{% endif %}>{{ r.competency.name }}</a>{% endfor %}</nav>
+<form method="post" class="card">{% csrf_token %}<input type="hidden" name="competency" value="{{ result.competency_id }}">
+  <div class="notice">The sheet is submitted. Give a reason for the correction; it is recorded in the audit log.</div>
+  {% include "includes/fields.html" %}
+  <div class="actions"><button class="btn" type="submit">Save correction</button></div>
+</form>
+{% endblock %}
