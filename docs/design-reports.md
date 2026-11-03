@@ -1,7 +1,7 @@
 # Design — Reports, Comparisons and Exports
 
-**Status:** Draft for review — decisions R1–R6 need answers\
-**Version:** 0.1\
+**Status:** Approved 3 November 2026 — R1–R6 accepted as recommended\
+**Version:** 1.0\
 **Date:** 3 November 2026\
 **Implements:** Requirements baseline v1.1, §11 (report types, drill-down and filters, individual learner
 report, comparisons, exports and access), §13 `report_exports`, §15 (sensitive exports audited)\
