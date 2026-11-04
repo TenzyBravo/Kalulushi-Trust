@@ -11,6 +11,9 @@ SESSION_MARKER = "_tracked_session"
 def track_login(sender, request, user, **kwargs):
     if request is None or not hasattr(request, "session"):
         return
+    if not request.session.session_key:
+        # Signing in over another user's session flushes it; the new session has no key until saved.
+        request.session.save()
     with transaction.atomic():
         row, _ = UserSession.objects.update_or_create(
             session_key=request.session.session_key,
