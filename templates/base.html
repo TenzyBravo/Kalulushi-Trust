@@ -19,6 +19,30 @@
     header form { margin:0; }
     header button { background:none; border:1px solid #fff8; border-radius:999px; padding:.2rem .8rem; cursor:pointer; font:inherit; }
     header .brand { font-family:var(--serif); font-size:1.2rem; letter-spacing:.01em; }
+
+    /* Main menu (module dropdowns, like the FLMZ portal) */
+    header { justify-content:flex-start; align-items:center; }
+    .menu-bar { display:flex; flex-wrap:wrap; gap:.15rem .25rem; align-items:center; flex:1; }
+    .menu-top { display:inline-flex; align-items:center; gap:.4rem; padding:.45rem .7rem; border-radius:10px; color:#fff; font-weight:700;
+      font-size:.95rem; cursor:pointer; list-style:none; white-space:nowrap; text-decoration:none; }
+    .menu-top::-webkit-details-marker { display:none; }
+    .menu-top > .icon:first-child { color:#5ee3a8; font-size:1.05rem; }
+    .menu-top > .icon:last-child:not(:first-child) { font-size:.8rem; opacity:.75; }
+    .menu-top:hover, details.menu[open] > .menu-top { background:#ffffff1a; text-decoration:none; }
+    .menu-top:focus-visible { outline:2px solid #5ee3a8; outline-offset:1px; }
+    details.menu { position:relative; }
+    .menu-panel { position:absolute; top:calc(100% + .35rem); left:0; z-index:50; min-width:15rem; background:#fff; border-radius:12px;
+      box-shadow:0 12px 32px #0f2f4c40; padding:.4rem; display:flex; flex-direction:column; }
+    .menu-panel-right { left:auto; right:0; }
+    .menu-panel a, .menu-panel button { display:flex; align-items:center; gap:.45rem; color:var(--ink); padding:.5rem .75rem; border-radius:8px;
+      font-weight:500; text-decoration:none; background:none; border:0; font:inherit; text-align:left; cursor:pointer; width:100%; }
+    .menu-panel a:hover, .menu-panel button:hover { background:#eef6f1; color:var(--accent-dark); text-decoration:none; }
+    .menu-panel form { margin:0; border-top:1px solid var(--line); margin-top:.25rem; padding-top:.25rem; }
+    .menu-user { margin-left:auto; }
+    @media (max-width: 760px) {
+      .menu-panel { position:static; box-shadow:none; margin-top:.25rem; }
+      .menu-user { margin-left:0; }
+    }
     main { max-width:1240px; margin:0 auto; padding:1.25rem 1rem 3rem; }
     h1 { font-size:1.5rem; margin:.25rem 0 1rem; }
     h2 { font-size:1.15rem; margin:1.25rem 0 .5rem; }
@@ -219,25 +243,7 @@
 <body>
   <header>
     <a class="brand" href="{% url 'home' %}">{{ school.name|default:"School" }}</a>
-    {% if user.is_authenticated %}
-    <nav>
-      {% if perms.attendance.view_attendancesession %}<a href="{% url 'attendance_today' %}">Registers</a>{% endif %}
-      {% if perms.attendance.view_absencecase %}<a href="{% url 'attendance_followup' %}">Follow-up</a>{% endif %}
-      {% if perms.assessment.view_assessment %}<a href="{% url 'assessment_home' %}">Assessments</a>{% endif %}
-      {% if perms.learners.view_learner %}<a href="{% url 'learner_list' %}">Learners</a>{% endif %}
-      {% if perms.learners.prepare_promotions %}<a href="{% url 'promotions' %}">Promotions</a>{% endif %}
-      {% if perms.reports.view_reports %}<a href="{% url 'reports' %}">Reports</a>{% endif %}
-      {% if perms.learners.add_learner %}<a href="{% url 'learner_register' %}">Register</a>{% endif %}
-      {% if perms.learners.import_learners %}<a href="{% url 'learner_import' %}">Import</a>{% endif %}
-      {% if perms.staffing.view_teacherassignment %}<a href="{% url 'assignments' %}">Assignments</a>{% endif %}
-      {% if perms.accounts.view_user %}<a href="{% url 'staff_list' %}">Staff</a>{% endif %}
-      {% if perms.attendance.add_closure or perms.attendance.add_calendarevent %}<a href="{% url 'attendance_calendar' %}">Calendar</a>{% endif %}
-      {% if user.is_staff %}<a href="{% url 'admin:index' %}">School setup</a>{% endif %}
-      {% if perms.core.view_audit_log %}<a href="{% url 'audit_log' %}">Audit log</a>{% endif %}
-      <span class="muted small" style="color:#d8efe6">{{ user.get_short_name }}</span>
-      <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button type="submit">Sign out</button></form>
-    </nav>
-    {% endif %}
+    {% if user.is_authenticated %}{% include "includes/nav.html" %}{% endif %}
   </header>
   <main>
     {% if messages %}<ul class="messages">{% for m in messages %}<li class="{{ m.tags }}">{{ m }}</li>{% endfor %}</ul>{% endif %}

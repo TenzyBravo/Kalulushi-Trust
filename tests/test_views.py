@@ -65,6 +65,19 @@ class ScreenTests(TestCase):
         self.assertNotIn("glance", response.context)
         self.assertEqual(response.context["learner_count"], 1)
 
+    def test_menus_follow_permissions(self):
+        self.login(self.head)
+        page = self.client.get("/").content.decode()
+        for menu in ["Class Register", "Absence Follow-up", "Student Performance", "People", "Transfers", "Reports", "Setup"]:
+            self.assertIn(menu, page)
+        self.assertIn("Approvals", page)
+        self.login(self.teacher)
+        page = self.client.get("/").content.decode()
+        self.assertIn("Class Register", page)
+        self.assertNotIn(">Approvals<", page)
+        self.assertNotIn("Audit log", page)
+        self.assertIn("TEACHER", page)  # user menu shows the name in capitals
+
     def test_register_through_the_screen(self):
         self.login(self.head)
         data = {"first_name": "Bwalya", "last_name": "Zulu", "date_of_birth": "2018-05-05", "gender": "M",

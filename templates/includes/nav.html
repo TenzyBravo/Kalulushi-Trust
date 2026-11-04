@@ -1,0 +1,108 @@
+{# Main menu: one item per module, each a dropdown, shown only where the user has the permission. #}
+<nav class="menu-bar" aria-label="Main">
+  <a class="menu-top" href="{% url 'home' %}">{% include "icons.html" with name="home" %} Dashboard</a>
+
+  {% if perms.attendance.view_attendancesession %}
+  <details class="menu"><summary class="menu-top">{% include "icons.html" with name="clipboard" %} Class Register {% include "icons.html" with name="caret" %}</summary>
+    <div class="menu-panel">
+      <a href="{% url 'attendance_today' %}">Today's registers</a>
+      {% if perms.attendance.add_closure or perms.attendance.add_calendarevent %}<a href="{% url 'attendance_calendar' %}">School calendar</a>{% endif %}
+      {% if perms.attendance.add_calendarevent %}<a href="{% url 'attendance_calendar_upload' %}">Upload the year's calendar</a>{% endif %}
+    </div>
+  </details>
+  {% endif %}
+
+  {% if perms.attendance.view_absencecase %}
+  <details class="menu"><summary class="menu-top">{% include "icons.html" with name="followup" %} Absence Follow-up {% include "icons.html" with name="caret" %}</summary>
+    <div class="menu-panel">
+      <a href="{% url 'attendance_followup' %}">Open cases</a>
+      {% if perms.attendance.review_escalations %}<a href="{% url 'attendance_followup' %}?status=escalated">Escalated to me</a>{% endif %}
+      <a href="{% url 'attendance_followup' %}?status=all">All cases</a>
+    </div>
+  </details>
+  {% endif %}
+
+  {% if perms.assessment.view_assessment %}
+  <details class="menu"><summary class="menu-top">{% include "icons.html" with name="cap" %} Student Performance {% include "icons.html" with name="caret" %}</summary>
+    <div class="menu-panel">
+      <a href="{% url 'assessment_home' %}">Assessments and marks</a>
+      <a href="{% url 'assessment_incomplete' %}">Missing and incomplete</a>
+      {% if user.is_staff %}<a href="{% url 'admin:assessment_assessmentplan_changelist' %}">Assessment plans and weights</a>
+      <a href="{% url 'admin:assessment_gradingscheme_changelist' %}">Grading schemes</a>
+      <a href="{% url 'admin:assessment_competencyframework_changelist' %}">Competency frameworks</a>{% endif %}
+    </div>
+  </details>
+  {% endif %}
+
+  {% if perms.learners.view_learner %}
+  <details class="menu"><summary class="menu-top">{% include "icons.html" with name="people" %} People {% include "icons.html" with name="caret" %}</summary>
+    <div class="menu-panel">
+      <a href="{% url 'learner_list' %}">Learners</a>
+      {% if perms.learners.add_learner %}<a href="{% url 'learner_register' %}">Register a learner</a>{% endif %}
+      {% if perms.learners.import_learners %}<a href="{% url 'learner_import' %}">Import learners</a>{% endif %}
+      {% if perms.accounts.view_user %}<a href="{% url 'staff_list' %}">Staff</a>
+      <a href="{% url 'permission_list' %}">Permissions</a>{% endif %}
+      {% if perms.staffing.view_teacherassignment %}<a href="{% url 'assignments' %}">Teacher assignments</a>{% endif %}
+    </div>
+  </details>
+  {% endif %}
+
+  {% if perms.learners.prepare_promotions %}
+  <details class="menu"><summary class="menu-top">{% include "icons.html" with name="swap" %} Transfers {% include "icons.html" with name="caret" %}</summary>
+    <div class="menu-panel">
+      <a href="{% url 'promotions' %}">Year-end promotions</a>
+      {% if perms.learners.approve_enrollment_requests %}<a href="{% url 'promotion_approvals' %}">Approvals</a>{% endif %}
+    </div>
+  </details>
+  {% endif %}
+
+  {% if perms.reports.view_reports %}
+  <details class="menu"><summary class="menu-top">{% include "icons.html" with name="chart" %} Reports {% include "icons.html" with name="caret" %}</summary>
+    <div class="menu-panel">
+      <a href="{% url 'reports' %}">All reports</a>
+      <a href="{% url 'report' 'attendance' %}">Attendance</a>
+      <a href="{% url 'report' 'followup' %}">Absenteeism and follow-up</a>
+      <a href="{% url 'report' 'performance' %}">Academic performance</a>
+      <a href="{% url 'report' 'competencies' %}">Competency development</a>
+      <a href="{% url 'report' 'enrollment' %}">Enrollment and class lists</a>
+      {% if perms.reports.view_reportexport %}<a href="{% url 'report_exports' %}">Exports log</a>{% endif %}
+    </div>
+  </details>
+  {% endif %}
+
+  {% if user.is_staff or perms.core.view_audit_log %}
+  <details class="menu"><summary class="menu-top">{% include "icons.html" with name="gear" %} Setup {% include "icons.html" with name="caret" %}</summary>
+    <div class="menu-panel">
+      {% if user.is_staff %}<a href="{% url 'admin:index' %}">School setup</a>
+      <a href="{% url 'admin:school_academicyear_changelist' %}">Academic years and terms</a>
+      <a href="{% url 'admin:school_classgroup_changelist' %}">Classes</a>{% endif %}
+      {% if perms.core.view_audit_log %}<a href="{% url 'audit_log' %}">Audit log</a>{% endif %}
+    </div>
+  </details>
+  {% endif %}
+
+  <details class="menu menu-user"><summary class="menu-top">{% include "icons.html" with name="user" %} {{ user.get_short_name|default:user.username|upper }} {% include "icons.html" with name="caret" %}</summary>
+    <div class="menu-panel menu-panel-right">
+      <a href="{% url 'staff_detail' user.pk %}">My profile</a>
+      <a href="{% url 'password_change' %}">Change password</a>
+      <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button type="submit">{% include "icons.html" with name="logout" %} Sign out</button></form>
+    </div>
+  </details>
+</nav>
+<script>
+  // One menu open at a time; close on a click outside or Escape.
+  (function () {
+    var menus = document.querySelectorAll(".menu-bar details.menu");
+    menus.forEach(function (m) {
+      m.addEventListener("toggle", function () {
+        if (m.open) menus.forEach(function (o) { if (o !== m) o.open = false; });
+      });
+    });
+    document.addEventListener("click", function (e) {
+      if (!e.target.closest(".menu-bar")) menus.forEach(function (m) { m.open = false; });
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") menus.forEach(function (m) { m.open = false; });
+    });
+  })();
+</script>
