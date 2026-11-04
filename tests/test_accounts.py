@@ -64,6 +64,15 @@ class SignInTests(TestCase):
         self.client.post("/login/", {"username": "grace", "password": f.PASSWORD})
         self.assertEqual(UserSession.objects.filter(user=self.user).count(), 1)
 
+    def test_signing_in_as_someone_else_without_signing_out(self):
+        """A shared computer: the second person signs in over the first one's session."""
+        other = f.make_user("peter", roles.TEACHER)
+        self.client.post("/login/", {"username": "grace", "password": f.PASSWORD})
+        response = self.client.post("/login/", {"username": "peter", "password": f.PASSWORD})
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(UserSession.objects.filter(user=other).count(), 1)
+        self.assertEqual(self.client.get("/").context["user"], other)
+
 
 class DeactivationTests(TestCase):
     def setUp(self):
